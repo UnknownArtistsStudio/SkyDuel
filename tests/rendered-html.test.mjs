@@ -71,5 +71,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
+  await access(new URL("../dist-pages/index.html", import.meta.url));
+  await access(new URL("../.github/workflows/pages.yml", import.meta.url));
   await assert.rejects(access(new URL("app/_sites-preview", projectRoot)));
 });

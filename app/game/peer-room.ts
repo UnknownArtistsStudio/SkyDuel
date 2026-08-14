@@ -1,5 +1,11 @@
 "use client";
 
+declare global {
+  interface Window {
+    SKY_DUEL_ROOM_ORIGIN?: string;
+  }
+}
+
 export type RoomInfo = {
   code: string;
   peerId: string;
@@ -78,10 +84,11 @@ export class PeerRoom {
     }
     this.peers.clear();
     const body = JSON.stringify({ code: this.info.code, peerId: this.info.peerId });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon("/api/game/leave", new Blob([body], { type: "application/json" }));
+    const leaveUrl = roomApiUrl("/api/game/leave");
+    if (!window.SKY_DUEL_ROOM_ORIGIN && navigator.sendBeacon) {
+      navigator.sendBeacon(leaveUrl, new Blob([body], { type: "application/json" }));
     } else {
-      void fetch("/api/game/leave", {
+      void fetch(leaveUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body,
@@ -96,7 +103,7 @@ export class PeerRoom {
     while (this.active) {
       try {
         const response = await fetch(
-          `/api/game/signals?code=${encodeURIComponent(this.info.code)}&peer=${encodeURIComponent(this.info.peerId)}&after=${this.cursor}`,
+          roomApiUrl(`/api/game/signals?code=${encodeURIComponent(this.info.code)}&peer=${encodeURIComponent(this.info.peerId)}&after=${this.cursor}`),
           { cache: "no-store" },
         );
         if (!response.ok) {
@@ -230,7 +237,7 @@ export class PeerRoom {
 }
 
 async function api<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(roomApiUrl(path), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -238,6 +245,13 @@ async function api<T>(path: string, body: unknown): Promise<T> {
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(payload.error ?? "The tower did not answer.");
   return payload;
+}
+
+function roomApiUrl(path: string) {
+  const origin = typeof window === "undefined"
+    ? ""
+    : (window.SKY_DUEL_ROOM_ORIGIN ?? "").replace(/\/$/, "");
+  return `${origin}${path}`;
 }
 
 function delay(milliseconds: number) {
