@@ -7,11 +7,13 @@ import {
   cleanName,
   createGame,
   removePlayer,
+  resetRound,
   stepGame,
   type GameState,
   type MatchMode,
   type PilotInput,
   type Plane,
+  type ScoreLimit,
   type Team,
   type TeamPreference,
 } from "../../lib/game-core";
@@ -43,22 +45,27 @@ export function SkyDuel() {
   const [screen, setScreen] = useState<Screen>("title");
   const [mode, setMode] = useState<Mode>(null);
   const [matchMode, setMatchMode] = useState<MatchMode>("free-for-all");
+  const [scoreLimit, setScoreLimit] = useState<ScoreLimit>(10);
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
   const [callsign, setCallsign] = useState("ACE");
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState("");
-  const [message, setMessage] = useState("Engine on. Open sky. No time limit.");
+  const [message, setMessage] = useState("Engine on. First to 10 wins.");
   const [error, setError] = useState("");
   const [hud, setHud] = useState<{
     readout: ReturnType<typeof pilotReadout>;
     pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null }>;
+    scoreLimit: ScoreLimit;
+    winner: GameState["winner"];
   }>({
     readout: { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0 },
     pilots: [],
+    scoreLimit: 10,
+    winner: null,
   });
   const [copied, setCopied] = useState(false);
 
-  const { readout, pilots } = hud;
+  const { readout, pilots, scoreLimit: activeScoreLimit, winner } = hud;
 
   const setupRoom = useCallback((
     room: PeerRoom,
@@ -111,6 +118,7 @@ export function SkyDuel() {
         gameRef.current = incoming.state;
         lastSoundEventRef.current = 0;
         setMatchMode(incoming.state.matchMode);
+        setScoreLimit(incoming.state.scoreLimit);
         setMode("guest");
         setScreen("playing");
         setMessage("Connected. Watch your airspeed.");
@@ -129,7 +137,7 @@ export function SkyDuel() {
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame("free-for-all");
+    const state = createGame("free-for-all", scoreLimit);
     const playerId = `pilot-${crypto.randomUUID()}`;
     addPlayer(state, playerId, cleanName(callsign));
     addPlayer(state, "practice-rival", "RIVAL");
@@ -140,11 +148,11 @@ export function SkyDuel() {
     inputRef.current = { ...neutralInput };
     setMode("practice");
     setRoomCode("");
-    setMessage("Open-ended practice duel · scores keep running.");
+    setMessage(`${limitLabel(scoreLimit)} practice duel.`);
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [callsign]);
+  }, [callsign, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -153,7 +161,7 @@ export function SkyDuel() {
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame(matchMode);
+      const state = createGame(matchMode, scoreLimit);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
       lastSoundEventRef.current = 0;
@@ -169,7 +177,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [callsign, matchMode, setupRoom, teamPreference]);
+  }, [callsign, matchMode, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -205,9 +213,18 @@ export function SkyDuel() {
     remoteInputsRef.current = {};
     setMode(null);
     setRoomCode("");
-    setMessage("Engine on. Open sky. No time limit.");
+    setMessage("Engine on. First to 10 wins.");
     setScreen("menu");
   }, []);
+
+  const restartRound = useCallback(() => {
+    const state = gameRef.current;
+    resetRound(state);
+    setMessage("New round. Clear skies.");
+    if (mode === "host") {
+      roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
+    }
+  }, [mode]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -281,7 +298,12 @@ export function SkyDuel() {
       }
 
       const localPlane = state.players.find((plane) => plane.id === localIdRef.current);
-      updateEngineSound(audioRef.current, engineSoundRef.current, localPlane, screen === "playing");
+      updateEngineSound(
+        audioRef.current,
+        engineSoundRef.current,
+        localPlane,
+        screen === "playing" && !state.winner,
+      );
       playNewSounds(state, lastSoundEventRef, audioRef);
       if (canvasRef.current) renderGame(canvasRef.current, state, localIdRef.current, time);
       if (time - lastHud > 100) {
@@ -290,6 +312,8 @@ export function SkyDuel() {
           pilots: state.players
             .map(({ id, name, color, score, team }) => ({ id, name, color, score, team }))
             .sort((a, b) => b.score - a.score),
+          scoreLimit: state.scoreLimit,
+          winner: state.winner,
         });
         lastHud = time;
       }
@@ -332,7 +356,7 @@ export function SkyDuel() {
         {screen === "playing" && (
           <>
             <div className="game-mode-label">
-              {modeLabel(mode)} · {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"}
+              {modeLabel(mode)} · {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} · {limitLabel(activeScoreLimit)}
             </div>
             <div className="scoreboard" aria-label="Pilot scores">
               {matchMode === "teams" && mode !== "practice" && (
@@ -366,10 +390,22 @@ export function SkyDuel() {
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
 
-            {!readout.alive && (
+            {!winner && !readout.alive && (
               <div className="respawn-card">
                 <span>SHOT DOWN</span>
                 <strong>BACK IN {Math.ceil(readout.respawnIn)}</strong>
+              </div>
+            )}
+
+            {winner && (
+              <div className="winner-card" role="status">
+                <span>WINNER</span>
+                <strong>{winnerLabel(winner, pilots)}</strong>
+                {mode === "guest" ? (
+                  <small>WAITING FOR LEAD PILOT</small>
+                ) : (
+                  <button type="button" onClick={restartRound}>PLAY AGAIN</button>
+                )}
               </div>
             )}
 
@@ -441,6 +477,7 @@ export function SkyDuel() {
                     TEAMS
                   </button>
                 </div>
+                <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
                 {matchMode === "teams" && (
                   <TeamPicker value={teamPreference} onChange={setTeamPreference} />
                 )}
@@ -508,11 +545,53 @@ function TeamPicker({
   );
 }
 
+function ScorePicker({
+  value,
+  onChange,
+}: {
+  value: ScoreLimit;
+  onChange: (scoreLimit: ScoreLimit) => void;
+}) {
+  const choices: Array<{ value: ScoreLimit; label: string }> = [
+    { value: 5, label: "5" },
+    { value: 10, label: "10" },
+    { value: 20, label: "20" },
+    { value: null, label: "NO LIMIT" },
+  ];
+  return (
+    <div className="choice-group score-picker" role="group" aria-label="Winning score">
+      <span>WIN AT</span>
+      {choices.map((choice) => (
+        <button
+          key={choice.label}
+          type="button"
+          aria-pressed={value === choice.value}
+          onClick={() => onChange(choice.value)}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function makeAttractGame() {
-  const state = createGame();
+  const state = createGame("free-for-all", null);
   addPlayer(state, "attract-one", "YELLOW");
   addPlayer(state, "attract-two", "RED");
   return state;
+}
+
+function limitLabel(scoreLimit: ScoreLimit) {
+  return scoreLimit === null ? "NO LIMIT" : `FIRST TO ${scoreLimit}`;
+}
+
+function winnerLabel(
+  winner: NonNullable<GameState["winner"]>,
+  pilots: Array<{ id: string; name: string; team: Team | null }>,
+) {
+  if (winner.kind === "team") return winner.team === 0 ? "RED TEAM" : "GREEN TEAM";
+  return pilots.find((pilot) => pilot.id === winner.playerId)?.name ?? "PILOT";
 }
 
 function sanitizeInput(input: PilotInput): PilotInput {

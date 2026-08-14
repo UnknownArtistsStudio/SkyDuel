@@ -46,9 +46,13 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /SAFE · GUNS OFF/);
   assert.match(component, /FREE FOR ALL/);
   assert.match(component, /TEAMS/);
+  assert.match(component, /NO LIMIT/);
+  assert.match(component, /FIRST TO/);
   assert.match(component, /pixelExplosion/);
   assert.match(core, /MAX_PLAYERS = 6/);
   assert.match(core, /matchMode/);
+  assert.match(core, /scoreLimit/);
+  assert.match(core, /winner/);
   assert.match(core, /STALL_SPEED = 78/);
   assert.match(core, /RECOVERY_SPEED = 102/);
   assert.match(renderer, /drawPixelCloud/);

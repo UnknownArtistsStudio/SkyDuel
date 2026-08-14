@@ -13,11 +13,13 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 
 ## Match types
 
-- **Practice duel:** one player against a computer rival with an open-ended score.
+- **Practice duel:** one player against a computer rival using the selected winning score.
 - **Private free-for-all:** every pilot can shoot every other pilot.
 - **Private teams:** pilots request red, green, or automatic team assignment; friendly fire and friendly collisions are disabled.
 
-Private room creators choose the room rules before opening the room. Joining pilots can request a team, which is used only when the host selected team play. Both private modes support up to six pilots.
+Private room creators choose first to 5, first to 10 (the default), first to 20, or no limit before opening the room. In free-for-all, the first pilot to the target wins. In teams, the red or green pilots' combined score decides the winner. The action freezes on the result screen and the lead pilot starts the next round.
+
+Joining pilots can request a team, which is used only when the host selected team play. Both private modes support up to six pilots.
 
 Private rooms use an encrypted, direct browser connection. The lead pilot runs the authoritative match simulation and sends synchronized snapshots to the other pilots. A small D1-backed signaling service introduces the browsers; it does not carry the match traffic itself.
 

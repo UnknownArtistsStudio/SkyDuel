@@ -75,6 +75,7 @@ button {
 
 .title-screen button,
 .menu-card button,
+.winner-card button,
 .room-ticket,
 .leave-button,
 .touch-controls button {
@@ -180,6 +181,10 @@ button {
   margin: 11px 0;
 }
 
+.score-picker {
+  grid-template-columns: 150px repeat(4, minmax(0, 1fr));
+}
+
 .choice-group button {
   min-height: 36px;
   padding: 7px 9px;
@@ -208,6 +213,8 @@ button {
 
 .menu-card button:hover,
 .menu-card button:focus-visible,
+.winner-card button:hover,
+.winner-card button:focus-visible,
 .title-screen button:hover,
 .title-screen button:focus-visible,
 .room-ticket:hover,
@@ -420,6 +427,36 @@ button {
   color: var(--white);
 }
 
+.winner-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  gap: 10px;
+  min-width: 240px;
+  padding: 20px 24px;
+  border: 5px solid var(--orange);
+  color: var(--orange);
+  background: var(--black);
+  font-size: 9px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.winner-card strong {
+  color: var(--white);
+  font-size: 18px;
+}
+
+.winner-card small {
+  color: var(--white);
+  font-size: 7px;
+}
+
+.winner-card button {
+  border-color: var(--orange);
+}
+
 .leave-button {
   position: absolute;
   right: 13px;
@@ -475,6 +512,10 @@ button {
 
   .choice-group {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .score-picker {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .choice-group > span {
