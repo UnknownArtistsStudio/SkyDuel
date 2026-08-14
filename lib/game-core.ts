@@ -1,18 +1,19 @@
 export const WORLD_WIDTH = 1200;
 export const WORLD_HEIGHT = 675;
 export const MAX_PLAYERS = 6;
-export const STALL_SPEED = 68;
-export const RECOVERY_SPEED = 88;
+export const STALL_SPEED = 78;
+export const RECOVERY_SPEED = 102;
 
-const GRAVITY = 76;
-const ENGINE_THRUST = 48;
-const DRAG = 0.0019;
-const LIFT = 0.00318;
-const TURN_RATE = 1.55;
-const SIDE_SLIP_DAMPING = 2.4;
-const PLANE_RADIUS = 14;
-const BULLET_SPEED = 365;
-const FIRE_DELAY = 0.23;
+const GRAVITY = 68;
+const ENGINE_THRUST = 66;
+const DRAG = 0.00172;
+const LIFT = 0.00177;
+const TURN_RATE = 1.65;
+const SIDE_SLIP_DAMPING = 2.8;
+const PLANE_RADIUS = 12;
+const BULLET_SPEED = 420;
+const BULLET_LIFE = 1.18;
+const FIRE_DELAY = 0.32;
 
 export type PilotInput = {
   turn: -1 | 0 | 1;
@@ -65,15 +66,15 @@ export type GameState = {
   events: GameEvent[];
 };
 
-const COLORS = ["#f3c84b", "#e85d45", "#4e9fe6", "#70b86f", "#d884d6", "#f0eee2"];
+const COLORS = ["#f02b10", "#00ad38", "#ffb20a", "#087bed", "#d43bce", "#f7f5ef"];
 
 const SPAWNS = [
-  { x: 128, y: 360, angle: 0, speed: 158, liftSide: 1 as const },
-  { x: 1072, y: 405, angle: Math.PI, speed: 158, liftSide: -1 as const },
-  { x: 250, y: 285, angle: 0, speed: 160, liftSide: 1 as const },
-  { x: 950, y: 250, angle: Math.PI, speed: 160, liftSide: -1 as const },
-  { x: 385, y: 180, angle: 0, speed: 162, liftSide: 1 as const },
-  { x: 815, y: 145, angle: Math.PI, speed: 162, liftSide: -1 as const },
+  { x: 110, y: 335, angle: 0, speed: 188, liftSide: 1 as const },
+  { x: 1090, y: 405, angle: Math.PI, speed: 188, liftSide: -1 as const },
+  { x: 270, y: 225, angle: 0, speed: 192, liftSide: 1 as const },
+  { x: 930, y: 175, angle: Math.PI, speed: 192, liftSide: -1 as const },
+  { x: 455, y: 110, angle: 0, speed: 196, liftSide: 1 as const },
+  { x: 745, y: 495, angle: Math.PI, speed: 196, liftSide: -1 as const },
 ];
 
 export function createGame(): GameState {
@@ -130,11 +131,8 @@ export function cleanName(name: string): string {
 }
 
 export function groundY(x: number): number {
-  const wrapped = ((x % WORLD_WIDTH) + WORLD_WIDTH) % WORLD_WIDTH;
-  if (wrapped < 245 || wrapped > 955) return 592;
-  const centerHill = 92 * Math.exp(-Math.pow((wrapped - 600) / 205, 2));
-  const smallRoll = 17 * Math.sin((wrapped - 245) / 78) + 7 * Math.sin(wrapped / 31);
-  return 592 - centerHill - smallRoll;
+  void x;
+  return 620;
 }
 
 export function planeSpeed(plane: Plane): number {
@@ -177,8 +175,8 @@ export function stepGame(
     }
 
     const authority = plane.stalled
-      ? 0.62
-      : clamp((speed - 42) / 90, 0.48, 1);
+      ? 0.66
+      : clamp((speed - 50) / 120, 0.52, 1);
     plane.angle = normalizeAngle(plane.angle + input.turn * TURN_RATE * authority * safeDt);
 
     const noseX = Math.cos(plane.angle);
@@ -188,8 +186,8 @@ export function stepGame(
     const refreshedForwardSpeed = Math.max(0, plane.vx * noseX + plane.vy * noseY);
     const liftForce = plane.stalled
       ? refreshedForwardSpeed * refreshedForwardSpeed * LIFT * 0.08
-      : Math.min(112, refreshedForwardSpeed * refreshedForwardSpeed * LIFT);
-    const thrust = ENGINE_THRUST * (plane.stalled ? 0.8 : 1);
+      : Math.min(108, refreshedForwardSpeed * refreshedForwardSpeed * LIFT);
+    const thrust = ENGINE_THRUST * (plane.stalled ? 0.84 : 1);
     const currentSpeed = Math.max(1, planeSpeed(plane));
     const dragForce = DRAG * currentSpeed;
     const sideSpeed = plane.vx * topX + plane.vy * topY;
@@ -236,7 +234,7 @@ function fireBullet(state: GameState, plane: Plane) {
     y: plane.y + noseY * 21,
     vx: plane.vx + noseX * BULLET_SPEED,
     vy: plane.vy + noseY * BULLET_SPEED,
-    life: 1.65,
+    life: BULLET_LIFE,
   });
   pushEvent(state, "shot", plane.id);
 }
@@ -256,7 +254,7 @@ function updateBullets(state: GameState, dt: number) {
       if (!plane.alive || plane.id === bullet.ownerId || plane.invulnerableFor > 0) continue;
       const dx = wrappedDistance(bullet.x, plane.x);
       const dy = bullet.y - plane.y;
-      if (dx * dx + dy * dy < 15 * 15) {
+      if (dx * dx + dy * dy < 12 * 12) {
         const shooter = state.players.find((candidate) => candidate.id === bullet.ownerId);
         if (shooter) shooter.score += 1;
         destroyPlane(state, plane, bullet.ownerId);
@@ -279,7 +277,7 @@ function updatePlaneCollisions(state: GameState) {
       if (!b.alive || b.invulnerableFor > 0) continue;
       const dx = wrappedDistance(a.x, b.x);
       const dy = a.y - b.y;
-      if (dx * dx + dy * dy < 24 * 24) {
+      if (dx * dx + dy * dy < 19 * 19) {
         destroyPlane(state, a, b.id);
         destroyPlane(state, b, a.id);
       }
@@ -292,7 +290,7 @@ function destroyPlane(state: GameState, plane: Plane, targetId?: string) {
   plane.alive = false;
   plane.stalled = false;
   plane.deaths += 1;
-  plane.respawnIn = 2.35;
+  plane.respawnIn = 2.75;
   plane.vx = 0;
   plane.vy = 0;
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== plane.id);
@@ -329,11 +327,12 @@ export function botInput(state: GameState, botId: string): PilotInput {
   const opponents = state.players.filter((player) => player.id !== botId && player.alive);
   const target = opponents.sort((a, b) => distanceSquared(bot, a) - distanceSquared(bot, b))[0];
 
-  let desiredAngle = target ? Math.atan2(target.y - bot.y, wrappedDistance(target.x, bot.x)) : 0;
+  const weave = Math.sin(state.time * 0.62 + bot.spawnIndex * 1.9) * 0.14;
+  let desiredAngle = target ? Math.atan2(target.y - bot.y, wrappedDistance(target.x, bot.x)) + weave : weave;
   const terrainClearance = groundY(bot.x) - bot.y;
-  if (bot.stalled || planeSpeed(bot) < 82) {
+  if (bot.stalled || planeSpeed(bot) < 96) {
     desiredAngle = bot.vx >= 0 ? 0.48 : Math.PI - 0.48;
-  } else if (terrainClearance < 105 && bot.vy > 12) {
+  } else if (terrainClearance < 120 && bot.vy > 12) {
     desiredAngle = bot.vx >= 0 ? -0.42 : -Math.PI + 0.42;
   }
 
@@ -342,7 +341,7 @@ export function botInput(state: GameState, botId: string): PilotInput {
   const targetDifference = target
     ? Math.abs(angleDifference(Math.atan2(target.y - bot.y, wrappedDistance(target.x, bot.x)), bot.angle))
     : Math.PI;
-  const fire = Boolean(target && targetDifference < 0.12 && distanceSquared(bot, target) < 430 * 430);
+  const fire = Boolean(target && targetDifference < 0.085 && distanceSquared(bot, target) < 380 * 380);
   return { turn, fire };
 }
 

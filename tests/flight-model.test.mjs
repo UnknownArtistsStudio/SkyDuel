@@ -26,7 +26,7 @@ function fly(state, plane, seconds, inputFor = () => ({ turn: 0, fire: false }))
   for (let frame = 0; frame < seconds * 60; frame += 1) {
     stepGame(state, { [plane.id]: inputFor(frame * FRAME, plane) }, FRAME);
     if (plane.alive) {
-      minimumClearance = Math.min(minimumClearance, groundY(plane.x) - plane.y - 14);
+      minimumClearance = Math.min(minimumClearance, groundY(plane.x) - plane.y - 12);
     }
   }
   return minimumClearance;
@@ -39,7 +39,7 @@ test("automatic engine power keeps every spawn safely airborne", () => {
 
     assert.equal(plane.deaths, 0, `spawn ${spawnIndex} crashed in level flight`);
     assert.ok(minimumClearance > 80, `spawn ${spawnIndex} flew too close to terrain`);
-    assert.ok(planeSpeed(plane) > 145, `spawn ${spawnIndex} lost engine speed`);
+    assert.ok(planeSpeed(plane) > 185, `spawn ${spawnIndex} lost engine speed`);
   }
 });
 
@@ -55,6 +55,7 @@ test("a climb and counter-turn gains altitude without a false stall", () => {
   assert.equal(plane.deaths, 0);
   assert.equal(plane.stalled, false);
   assert.ok(plane.y < startingY - 50, "the aircraft did not carry through the climb");
+  assert.ok(planeSpeed(plane) > 165, "the aircraft lost too much speed in a normal climb");
 });
 
 test("a genuine low-speed stall can recover by pointing the nose down", () => {
@@ -77,5 +78,5 @@ test("a genuine low-speed stall can recover by pointing the nose down", () => {
   assert.equal(sawStall, true, "the prolonged climb never stalled");
   assert.equal(sawRecovery, true, "the aircraft did not recover after diving");
   assert.equal(plane.deaths, 0, "the aircraft crashed before recovery");
-  assert.ok(planeSpeed(plane) > 88, "recovery happened without rebuilding airspeed");
+  assert.ok(planeSpeed(plane) > 102, "recovery happened without rebuilding airspeed");
 });

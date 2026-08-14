@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #20231d;
-  --cream: #eee7c7;
-  --paper: #d6cda7;
-  --olive: #3e4632;
-  --olive-dark: #24291f;
-  --yellow: #f0c746;
-  --red: #cc4f3d;
-  --sky: #83b5bd;
+  --ink: #17131f;
+  --cream: #fffdf8;
+  --paper: #9b90f4;
+  --olive: #282137;
+  --olive-dark: #17131f;
+  --yellow: #f2a913;
+  --red: #f02b10;
+  --sky: #9b90f4;
 }
 
 * {
@@ -23,11 +23,8 @@ html {
 body {
   margin: 0;
   color: var(--cream);
-  background:
-    radial-gradient(circle at 50% -10%, rgba(125, 139, 91, 0.32), transparent 42rem),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 4px),
-    var(--olive-dark);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--olive-dark);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 button,
@@ -40,9 +37,9 @@ button {
 }
 
 .site-shell {
-  width: min(1440px, 100%);
+  width: min(1320px, 100%);
   margin: 0 auto;
-  padding: 28px clamp(18px, 4vw, 62px) 24px;
+  padding: 24px clamp(14px, 3.5vw, 48px) 22px;
 }
 
 .masthead {
@@ -68,44 +65,43 @@ button {
 
 .brand-kicker {
   display: block;
-  margin-bottom: 4px;
-  color: #b8bd97;
+  margin-bottom: 7px;
+  color: var(--yellow);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .brand-lockup h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(40px, 6vw, 76px);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(38px, 5.4vw, 68px);
   font-weight: 900;
-  line-height: 0.86;
-  letter-spacing: -0.055em;
+  line-height: 0.9;
+  letter-spacing: 0.035em;
   color: var(--cream);
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  text-shadow: 5px 5px 0 #3a3050;
 }
 
 .brand-lockup h1 i {
   color: var(--yellow);
-  font-weight: 400;
+  font-weight: 900;
+  font-style: normal;
 }
 
 .masthead-note {
   max-width: 260px;
   margin: 0 0 4px;
-  color: #aeb295;
-  font-size: 13px;
+  color: #b8afea;
+  font-size: 11px;
   text-align: right;
 }
 
 .game-cabinet {
-  padding: 12px;
-  border: 1px solid #656b50;
-  border-radius: 14px;
-  background:
-    linear-gradient(130deg, rgba(255,255,255,0.08), transparent 18%),
-    #39402f;
-  box-shadow: 0 26px 65px rgba(8, 11, 8, 0.42), inset 0 1px 0 rgba(255,255,255,0.1);
+  padding: 10px;
+  border: 5px solid var(--yellow);
+  border-radius: 0;
+  background: #282137;
+  box-shadow: 12px 12px 0 #0d0a12;
 }
 
 .cabinet-topline {
@@ -114,7 +110,7 @@ button {
   align-items: center;
   min-height: 31px;
   padding: 0 8px 10px;
-  color: #b7bc99;
+  color: #fffdf8;
   font-size: 9px;
   font-weight: 700;
 }
@@ -132,10 +128,10 @@ button {
   overflow: hidden;
   aspect-ratio: 16 / 9;
   min-height: 320px;
-  border: 9px solid #171a16;
-  border-radius: 10px;
-  background: #82b5bc;
-  box-shadow: inset 0 0 0 2px #070907, inset 0 0 42px rgba(0, 0, 0, 0.48);
+  border: 10px solid var(--yellow);
+  border-radius: 0;
+  background: var(--sky);
+  box-shadow: inset 0 0 0 5px var(--ink);
 }
 
 .game-canvas {
@@ -151,21 +147,20 @@ button {
   display: grid;
   place-items: center;
   padding: clamp(12px, 3vw, 34px);
-  background: linear-gradient(90deg, rgba(20, 28, 25, 0.1), rgba(20, 28, 25, 0.48));
+  background: rgba(155, 144, 244, 0.18);
 }
 
 .menu-card {
   width: min(470px, 96%);
   padding: clamp(21px, 4vw, 36px);
-  border: 1px solid rgba(238, 231, 199, 0.55);
-  background: rgba(31, 37, 31, 0.92);
-  box-shadow: 10px 10px 0 rgba(31, 37, 31, 0.34);
-  backdrop-filter: blur(7px);
+  border: 5px solid var(--cream);
+  background: rgba(155, 144, 244, 0.96);
+  box-shadow: 10px 10px 0 var(--ink);
 }
 
 .menu-eyebrow {
   margin: 0 0 9px;
-  color: var(--yellow);
+  color: var(--ink);
   font-size: 9px;
   font-weight: 800;
 }
@@ -173,16 +168,16 @@ button {
 .menu-card h2 {
   margin: 0;
   color: var(--cream);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(27px, 4vw, 48px);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: clamp(25px, 3.6vw, 43px);
+  line-height: 1.03;
+  letter-spacing: 0.015em;
 }
 
 .menu-intro {
   max-width: 420px;
   margin: 14px 0 20px;
-  color: #c4c5ac;
+  color: #241d31;
   font-size: clamp(12px, 1.4vw, 14px);
   line-height: 1.45;
 }
@@ -191,11 +186,11 @@ button {
   display: grid;
   grid-template-columns: 90px 1fr;
   align-items: center;
-  border-bottom: 1px solid #777c62;
+  border-bottom: 3px solid var(--cream);
 }
 
 .callsign-field span {
-  color: #adb192;
+  color: #241d31;
   font-size: 9px;
   font-weight: 800;
 }
@@ -205,7 +200,7 @@ button {
   padding: 9px 0;
   border: 0;
   outline: 0;
-  color: var(--cream);
+  color: var(--ink);
   background: transparent;
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 16px;
@@ -214,7 +209,7 @@ button {
 }
 
 .callsign-field:focus-within {
-  border-color: var(--yellow);
+  border-color: var(--ink);
 }
 
 .menu-actions {
@@ -229,27 +224,27 @@ button {
 .cabinet-controls > button {
   min-height: 42px;
   padding: 10px 14px;
-  border: 1px solid #7a8068;
-  color: #e3ddc0;
-  background: transparent;
+  border: 3px solid var(--cream);
+  color: var(--cream);
+  background: var(--ink);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition: transform 80ms steps(1, end), background 80ms steps(1, end);
 }
 
 .menu-actions button:hover,
 .menu-actions button:focus-visible,
 .connecting-card button:hover,
 .cabinet-controls > button:hover {
-  border-color: var(--cream);
-  transform: translateY(-1px);
+  background: #332847;
+  transform: translate(-2px, -2px);
 }
 
 .menu-actions .button-primary {
   grid-column: 1 / -1;
-  border-color: var(--yellow);
+  border-color: var(--ink);
   color: var(--ink);
   background: var(--yellow);
 }
@@ -282,12 +277,12 @@ button {
 }
 
 .room-code-field input::placeholder {
-  color: rgba(238, 231, 199, 0.19);
+  color: rgba(23, 19, 31, 0.25);
 }
 
 .form-error {
   margin: 12px 0 0;
-  color: #ffad95;
+  color: #5c1520;
   font-size: 12px;
 }
 
@@ -306,10 +301,10 @@ button {
   width: 42px;
   height: 42px;
   margin: 0 auto 18px;
-  border: 1px solid #a9ad8e;
+  border: 4px solid var(--cream);
   border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0 75%, rgba(240, 199, 70, 0.72));
-  animation: sweep 1.2s linear infinite;
+  background: conic-gradient(from 0deg, transparent 0 75%, var(--yellow));
+  animation: sweep 1.2s steps(12, end) infinite;
 }
 
 @keyframes sweep {
@@ -332,8 +327,8 @@ button {
   gap: 6px;
   align-items: center;
   padding: 4px 6px;
-  color: #f8f0cc;
-  background: rgba(24, 29, 24, 0.7);
+  color: var(--cream);
+  background: var(--ink);
   font-size: 9px;
 }
 
@@ -358,14 +353,14 @@ button {
   right: 13px;
   display: grid;
   padding: 6px 9px;
-  border: 1px solid rgba(238, 231, 199, 0.7);
+  border: 3px solid var(--cream);
   color: var(--cream);
-  background: rgba(24, 29, 24, 0.72);
+  background: var(--ink);
   text-align: left;
 }
 
 .room-ticket span {
-  color: #bec1a5;
+  color: #c9c1f2;
   font-size: 7px;
 }
 
@@ -385,14 +380,14 @@ button {
   align-items: center;
   width: min(580px, calc(100% - 30px));
   padding: 7px 12px;
-  color: #e8e2c6;
-  background: rgba(27, 33, 26, 0.77);
+  color: var(--cream);
+  background: var(--ink);
   font-size: 8px;
   transform: translateX(-50%);
 }
 
 .flight-readout span:nth-child(2) {
-  color: #cfd3b2;
+  color: var(--yellow);
   font-weight: 800;
   text-align: center;
 }
@@ -402,13 +397,13 @@ button {
 }
 
 .flight-readout strong {
-  color: #fff4c1;
+  color: var(--cream);
   font-size: 12px;
 }
 
 .flight-readout.is-stalled {
   color: white;
-  background: rgba(139, 42, 32, 0.88);
+  background: var(--red);
   animation: warning 0.62s steps(2, end) infinite;
 }
 
@@ -427,9 +422,9 @@ button {
   display: grid;
   gap: 5px;
   padding: 14px 22px;
-  border: 1px solid #f0c746;
-  color: #f0c746;
-  background: rgba(31, 35, 29, 0.9);
+  border: 4px solid var(--yellow);
+  color: var(--yellow);
+  background: var(--ink);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 9px;
   text-align: center;
@@ -451,7 +446,7 @@ button {
   gap: 22px;
   min-height: 66px;
   padding: 11px 7px 0;
-  color: #bec2a1;
+  color: #c9c1f2;
   font-size: 8px;
 }
 
@@ -464,11 +459,11 @@ button {
 kbd {
   min-width: 28px;
   padding: 5px 7px;
-  border: 1px solid #777d64;
+  border: 2px solid var(--cream);
   border-bottom-width: 3px;
-  border-radius: 4px;
-  color: #eee7c7;
-  background: #2a3024;
+  border-radius: 0;
+  color: var(--cream);
+  background: var(--ink);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 9px;
   text-align: center;
@@ -483,7 +478,7 @@ kbd {
 }
 
 .stall-note strong {
-  color: #e2dcc0;
+  color: var(--cream);
   font-size: 9px;
   letter-spacing: 0;
 }
@@ -498,7 +493,7 @@ kbd {
   justify-content: space-between;
   gap: 22px;
   margin: 15px 4px 0;
-  color: #8e9578;
+  color: #8f86b7;
   font-size: 8px;
   line-height: 1.5;
 }
@@ -573,10 +568,10 @@ kbd {
 
   .touch-controls button {
     min-height: 53px;
-    border: 1px solid rgba(255, 244, 193, 0.72);
-    border-radius: 6px;
+    border: 3px solid var(--cream);
+    border-radius: 0;
     color: var(--cream);
-    background: rgba(30, 36, 29, 0.78);
+    background: var(--ink);
     font-size: 25px;
     touch-action: none;
     user-select: none;
@@ -585,7 +580,7 @@ kbd {
   .touch-controls .touch-fire {
     border-color: var(--yellow);
     color: var(--ink);
-    background: rgba(240, 199, 70, 0.88);
+    background: var(--yellow);
     font-family: var(--font-geist-mono), ui-monospace, monospace;
     font-size: 12px;
     font-weight: 900;

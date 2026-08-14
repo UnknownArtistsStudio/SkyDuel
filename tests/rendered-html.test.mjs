@@ -34,10 +34,12 @@ test("renders the finished Sky Duel game shell", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
-test("keeps the original-style flight and multiplayer promises in the product", async () => {
-  const [component, core, peerRoom, packageJson] = await Promise.all([
+test("keeps the original-style flight, pixel display, and multiplayer promises", async () => {
+  const [component, core, renderer, styles, peerRoom, packageJson] = await Promise.all([
     readFile(new URL("../app/game/SkyDuel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/game-core.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/game/render-game.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/game/peer-room.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
@@ -46,8 +48,12 @@ test("keeps the original-style flight and multiplayer promises in the product", 
   assert.match(component, /CREATE PRIVATE ROOM/);
   assert.match(component, /JOIN A ROOM/);
   assert.match(core, /MAX_PLAYERS = 6/);
-  assert.match(core, /STALL_SPEED = 68/);
-  assert.match(core, /RECOVERY_SPEED = 88/);
+  assert.match(core, /STALL_SPEED = 78/);
+  assert.match(core, /RECOVERY_SPEED = 102/);
+  assert.match(renderer, /drawPixelCloud/);
+  assert.match(renderer, /#9b90f4/);
+  assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
+  assert.match(styles, /--sky: #9b90f4/);
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));

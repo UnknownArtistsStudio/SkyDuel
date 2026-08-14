@@ -1,17 +1,17 @@
 # Sky Duel
 
-An original browser homage to early console biplane dogfights. Two to six pilots share one compact airfield with constant engine power, basic forward guns, momentum, stalls, and genuine nose-down recovery.
+An original browser homage to early console biplane dogfights. Two to six pilots share a wide, flat-colour pixel sky with fast automatic engine power, basic forward guns, momentum, stalls, and genuine nose-down recovery.
 
 ## Play
 
 - **A / D** or **arrow keys** rotate the aircraft.
 - **Space** or **Enter** fires the forward gun.
-- Climbing trades speed for altitude. If the aircraft stalls, point the nose down, allow speed to rebuild, then ease back into level flight.
-- The desktop layout also includes touch controls for phones and tablets.
+- A normal climb retains plenty of power; a prolonged steep climb still trades speed for altitude. If the aircraft stalls, point the nose down, allow speed to rebuild, then ease back into level flight.
+- The layout includes touch controls for phones and tablets.
 
 ## Match types
 
-- **Practice duel:** one player against a computer rival.
+- **Practice duel:** one player against a computer rival with an open-ended score.
 - **Private room:** the lead pilot creates a four-letter room code and shares it with up to five friends.
 
 Private rooms use an encrypted, direct browser connection. The lead pilot runs the authoritative match simulation and sends synchronized snapshots to the other pilots. A small D1-backed signaling service introduces the browsers; it does not carry the match traffic itself.

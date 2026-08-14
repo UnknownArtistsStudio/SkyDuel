@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   const title = "Sky Duel — Browser Biplane Dogfights";
   const description =
-    "A deliberately simple, old-school biplane dogfight for two to six pilots. Keep your speed, lead your shot, and recover from the stall.";
+    "A fast, stripped-back pixel biplane dogfight for two to six pilots. Climb, lead your shot, and recover from the stall.";
   return {
     metadataBase: base,
     title,

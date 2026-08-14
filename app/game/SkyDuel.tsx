@@ -39,7 +39,7 @@ export function SkyDuel() {
   const [callsign, setCallsign] = useState("ACE");
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState("");
-  const [message, setMessage] = useState("Climb gently. Keep your airspeed.");
+  const [message, setMessage] = useState("Engine on. Open sky. No time limit.");
   const [error, setError] = useState("");
   const [hud, setHud] = useState<{
     readout: ReturnType<typeof pilotReadout>;
@@ -110,7 +110,7 @@ export function SkyDuel() {
     inputRef.current = { ...neutralInput };
     setMode("practice");
     setRoomCode("");
-    setMessage("Practice duel · first to five is bragging rights.");
+    setMessage("Open-ended practice duel · scores keep running.");
     setError("");
     setScreen("playing");
     wakeAudio(audioRef);
@@ -173,7 +173,7 @@ export function SkyDuel() {
     remoteInputsRef.current = {};
     setMode(null);
     setRoomCode("");
-    setMessage("Climb gently. Keep your airspeed.");
+    setMessage("Engine on. Open sky. No time limit.");
     setScreen("menu");
   }, []);
 
@@ -277,10 +277,10 @@ export function SkyDuel() {
     <main className="site-shell">
       <header className="masthead">
         <div className="brand-lockup" aria-label="Sky Duel">
-          <span className="brand-kicker">BROWSER AIR COMBAT · 2–6 PILOTS</span>
+          <span className="brand-kicker">BIPLANE COMBAT · 2–6 PILOTS</span>
           <h1>SKY <i>DUEL</i></h1>
         </div>
-        <p className="masthead-note">One sky. Two controls. No upgrades.</p>
+        <p className="masthead-note">Full power. Open sky. No upgrades.</p>
       </header>
 
       <section className="game-cabinet" aria-label="Sky Duel game">
@@ -362,10 +362,10 @@ export function SkyDuel() {
             <div className="hangar-overlay">
               {screen === "menu" && (
                 <div className="menu-card">
-                  <p className="menu-eyebrow">THE OLD RULES STILL APPLY</p>
-                  <h2>Keep your speed.<br />Lead your shot.</h2>
+                  <p className="menu-eyebrow">THE OLD RULES</p>
+                  <h2>CLIMB. TURN.<br />FIRE.</h2>
                   <p className="menu-intro">
-                    Constant engine power, one forward gun, and no magic recovery. Pull too hard and gravity wins.
+                    The engine stays on and scores keep running. Climb hard, but lose too much speed and you will stall.
                   </p>
                   <label className="callsign-field">
                     <span>CALL SIGN</span>
