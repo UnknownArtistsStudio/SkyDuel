@@ -1,14 +1,15 @@
 export const WORLD_WIDTH = 1200;
 export const WORLD_HEIGHT = 675;
 export const MAX_PLAYERS = 6;
-export const STALL_SPEED = 72;
-export const RECOVERY_SPEED = 92;
+export const STALL_SPEED = 68;
+export const RECOVERY_SPEED = 88;
 
-const GRAVITY = 84;
-const ENGINE_THRUST = 31;
-const DRAG = 0.00175;
-const LIFT = 0.00485;
-const TURN_RATE = 2.35;
+const GRAVITY = 76;
+const ENGINE_THRUST = 48;
+const DRAG = 0.0019;
+const LIFT = 0.00318;
+const TURN_RATE = 1.55;
+const SIDE_SLIP_DAMPING = 2.4;
 const PLANE_RADIUS = 14;
 const BULLET_SPEED = 365;
 const FIRE_DELAY = 0.23;
@@ -67,12 +68,12 @@ export type GameState = {
 const COLORS = ["#f3c84b", "#e85d45", "#4e9fe6", "#70b86f", "#d884d6", "#f0eee2"];
 
 const SPAWNS = [
-  { x: 128, y: 510, angle: -0.08, speed: 132, liftSide: 1 as const },
-  { x: 1072, y: 510, angle: Math.PI + 0.08, speed: 132, liftSide: -1 as const },
-  { x: 250, y: 315, angle: -0.12, speed: 136, liftSide: 1 as const },
-  { x: 950, y: 315, angle: Math.PI + 0.12, speed: 136, liftSide: -1 as const },
-  { x: 385, y: 185, angle: 0.08, speed: 138, liftSide: 1 as const },
-  { x: 815, y: 185, angle: Math.PI - 0.08, speed: 138, liftSide: -1 as const },
+  { x: 128, y: 360, angle: 0, speed: 158, liftSide: 1 as const },
+  { x: 1072, y: 405, angle: Math.PI, speed: 158, liftSide: -1 as const },
+  { x: 250, y: 285, angle: 0, speed: 160, liftSide: 1 as const },
+  { x: 950, y: 250, angle: Math.PI, speed: 160, liftSide: -1 as const },
+  { x: 385, y: 180, angle: 0, speed: 162, liftSide: 1 as const },
+  { x: 815, y: 145, angle: Math.PI, speed: 162, liftSide: -1 as const },
 ];
 
 export function createGame(): GameState {
@@ -165,9 +166,9 @@ export function stepGame(
     const angleOfAttack = Math.abs(angleDifference(plane.angle, velocityAngle));
     const wasStalled = plane.stalled;
 
-    if (!plane.stalled && (forwardSpeed < STALL_SPEED || (angleOfAttack > 0.72 && speed < 132))) {
+    if (!plane.stalled && (speed < STALL_SPEED || (speed < RECOVERY_SPEED && angleOfAttack > 1))) {
       plane.stalled = true;
-    } else if (plane.stalled && forwardSpeed > RECOVERY_SPEED && angleOfAttack < 0.38) {
+    } else if (plane.stalled && speed > RECOVERY_SPEED && forwardSpeed > 0 && angleOfAttack < 0.7) {
       plane.stalled = false;
     }
 
@@ -176,8 +177,8 @@ export function stepGame(
     }
 
     const authority = plane.stalled
-      ? 0.43
-      : clamp((speed - 38) / 82, 0.38, 1);
+      ? 0.62
+      : clamp((speed - 42) / 90, 0.48, 1);
     plane.angle = normalizeAngle(plane.angle + input.turn * TURN_RATE * authority * safeDt);
 
     const noseX = Math.cos(plane.angle);
@@ -186,14 +187,20 @@ export function stepGame(
     const topY = -Math.cos(plane.angle) * plane.liftSide;
     const refreshedForwardSpeed = Math.max(0, plane.vx * noseX + plane.vy * noseY);
     const liftForce = plane.stalled
-      ? refreshedForwardSpeed * refreshedForwardSpeed * LIFT * 0.07
-      : Math.min(126, refreshedForwardSpeed * refreshedForwardSpeed * LIFT);
-    const thrust = ENGINE_THRUST * (plane.stalled ? 0.72 : 1);
+      ? refreshedForwardSpeed * refreshedForwardSpeed * LIFT * 0.08
+      : Math.min(112, refreshedForwardSpeed * refreshedForwardSpeed * LIFT);
+    const thrust = ENGINE_THRUST * (plane.stalled ? 0.8 : 1);
     const currentSpeed = Math.max(1, planeSpeed(plane));
     const dragForce = DRAG * currentSpeed;
+    const sideSpeed = plane.vx * topX + plane.vy * topY;
+    const sideSlipDamping = plane.stalled ? 0.28 : SIDE_SLIP_DAMPING;
 
-    plane.vx += (noseX * thrust + topX * liftForce - plane.vx * dragForce) * safeDt;
-    plane.vy += (noseY * thrust + topY * liftForce - plane.vy * dragForce + GRAVITY) * safeDt;
+    plane.vx +=
+      (noseX * thrust + topX * liftForce - plane.vx * dragForce - topX * sideSpeed * sideSlipDamping) *
+      safeDt;
+    plane.vy +=
+      (noseY * thrust + topY * liftForce - plane.vy * dragForce + GRAVITY - topY * sideSpeed * sideSlipDamping) *
+      safeDt;
 
     plane.x += plane.vx * safeDt;
     plane.y += plane.vy * safeDt;

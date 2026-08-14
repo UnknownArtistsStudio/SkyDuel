@@ -1,5 +1,5 @@
-import { LoopAndLead } from "./game/LoopAndLead";
+import { SkyDuel } from "./game/SkyDuel";
 
 export default function Home() {
-  return <LoopAndLead />;
+  return <SkyDuel />;
 }

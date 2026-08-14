@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "Loop & Lead — Browser Biplane Dogfights";
+  const title = "Sky Duel — Browser Biplane Dogfights";
   const description =
     "A deliberately simple, old-school biplane dogfight for two to six pilots. Keep your speed, lead your shot, and recover from the stall.";
   return {

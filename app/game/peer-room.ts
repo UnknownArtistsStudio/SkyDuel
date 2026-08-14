@@ -174,7 +174,7 @@ export class PeerRoom {
     connection.ondatachannel = (event) => this.attachChannel(peerId, event.channel);
 
     if (initiator) {
-      this.attachChannel(peerId, connection.createDataChannel("loop-and-lead"));
+      this.attachChannel(peerId, connection.createDataChannel("sky-duel"));
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);
       await this.signal(peerId, "offer", offer);

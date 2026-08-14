@@ -24,7 +24,7 @@ type NetworkMessage =
 
 const neutralInput: PilotInput = { turn: 0, fire: false };
 
-export function LoopAndLead() {
+export function SkyDuel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<GameState>(makeAttractGame());
   const roomRef = useRef<PeerRoom | null>(null);
@@ -276,14 +276,14 @@ export function LoopAndLead() {
   return (
     <main className="site-shell">
       <header className="masthead">
-        <div className="brand-lockup" aria-label="Loop and Lead">
+        <div className="brand-lockup" aria-label="Sky Duel">
           <span className="brand-kicker">BROWSER AIR COMBAT · 2–6 PILOTS</span>
-          <h1>LOOP <i>&amp;</i> LEAD</h1>
+          <h1>SKY <i>DUEL</i></h1>
         </div>
         <p className="masthead-note">One sky. Two controls. No upgrades.</p>
       </header>
 
-      <section className="game-cabinet" aria-label="Loop and Lead game">
+      <section className="game-cabinet" aria-label="Sky Duel game">
         <div className="cabinet-topline">
           <span>{screen === "playing" ? modeLabel(mode) : "AIRFIELD 01"}</span>
           <span className="status-copy">{message}</span>

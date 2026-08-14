@@ -1,4 +1,4 @@
-# Loop & Lead
+# Sky Duel
 
 An original browser homage to early console biplane dogfights. Two to six pilots share one compact airfield with constant engine power, basic forward guns, momentum, stalls, and genuine nose-down recovery.
 
@@ -37,7 +37,7 @@ npx tsc --noEmit
 
 ## Project map
 
-- `app/game/LoopAndLead.tsx` — game shell, controls, modes, and match loop
+- `app/game/SkyDuel.tsx` — game shell, controls, modes, and match loop
 - `lib/game-core.ts` — shared flight, stall, collision, firing, and scoring rules
 - `app/game/peer-room.ts` — six-player WebRTC room connection
 - `worker/game-api.ts` — room codes and WebRTC signaling

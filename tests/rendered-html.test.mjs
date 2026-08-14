@@ -19,15 +19,15 @@ async function render() {
   );
 }
 
-test("renders the finished Loop & Lead game shell", async () => {
+test("renders the finished Sky Duel game shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Loop &amp; Lead — Browser Biplane Dogfights<\/title>/i);
-  assert.match(html, /LOOP/);
-  assert.match(html, /LEAD/);
+  assert.match(html, /<title>Sky Duel — Browser Biplane Dogfights<\/title>/i);
+  assert.match(html, /SKY/);
+  assert.match(html, /DUEL/);
   assert.match(html, /PRACTICE DUEL/);
   assert.match(html, /CREATE PRIVATE ROOM/);
   assert.match(html, /Biplane dogfight arena/);
@@ -36,7 +36,7 @@ test("renders the finished Loop & Lead game shell", async () => {
 
 test("keeps the original-style flight and multiplayer promises in the product", async () => {
   const [component, core, peerRoom, packageJson] = await Promise.all([
-    readFile(new URL("../app/game/LoopAndLead.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game/SkyDuel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/game-core.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/peer-room.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -46,8 +46,8 @@ test("keeps the original-style flight and multiplayer promises in the product", 
   assert.match(component, /CREATE PRIVATE ROOM/);
   assert.match(component, /JOIN A ROOM/);
   assert.match(core, /MAX_PLAYERS = 6/);
-  assert.match(core, /STALL_SPEED = 72/);
-  assert.match(core, /RECOVERY_SPEED = 92/);
+  assert.match(core, /STALL_SPEED = 68/);
+  assert.match(core, /RECOVERY_SPEED = 88/);
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
