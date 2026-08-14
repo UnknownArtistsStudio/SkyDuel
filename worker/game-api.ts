@@ -6,6 +6,11 @@ type GameContext = { waitUntil(promise: Promise<unknown>): void };
 const ROOM_LIFETIME = 4 * 60 * 60 * 1000;
 const SIGNAL_LIFETIME = 10 * 60 * 1000;
 const SIGNAL_KINDS = new Set(["offer", "answer", "ice"]);
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+};
 let schemaReady: Promise<void> | undefined;
 let lastCleanupAt = 0;
 
@@ -16,6 +21,9 @@ export async function handleGameApi(
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/game/")) return null;
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   if (!env.DB) return json({ error: "The room service is not available." }, 503);
 
   schemaReady ??= ensureSchema(env.DB);
@@ -250,6 +258,7 @@ function json(body: unknown, status = 200) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
+      ...CORS_HEADERS,
     },
   });
 }

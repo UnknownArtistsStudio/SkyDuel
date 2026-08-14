@@ -23,6 +23,12 @@ Joining pilots can request a team, which is used only when the host selected tea
 
 Private rooms use an encrypted, direct browser connection. The lead pilot runs the authoritative match simulation and sends synchronized snapshots to the other pilots. A small D1-backed signaling service introduces the browsers; it does not carry the match traffic itself.
 
+## GitHub Pages
+
+The repository includes a separate static build for GitHub Pages. The public Pages version uses the same game and design while sending only room introductions to the public Sky Duel signaling service. Match movement and inputs still travel directly between the players' browsers.
+
+Every push to `main` runs the Pages deployment workflow. The static build can also be checked locally with `npm run build:pages`.
+
 ## Local development
 
 Requirements: Node.js 22.13 or newer.

@@ -102,7 +102,11 @@ strong {
   display: grid;
   place-items: end center;
   padding: 7%;
-  background: url("/og.png") center / cover no-repeat;
+  background-color: var(--purple);
+  background-image: var(--title-art, url("/og.png"));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   image-rendering: pixelated;
 }
 
