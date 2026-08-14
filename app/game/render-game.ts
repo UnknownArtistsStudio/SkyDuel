@@ -163,11 +163,14 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
 
 export function pilotReadout(state: GameState, pilotId: string) {
   const plane = state.players.find((candidate) => candidate.id === pilotId);
-  if (!plane) return { speed: 0, altitude: 0, stalled: false, alive: false, respawnIn: 0 };
+  if (!plane) {
+    return { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0 };
+  }
   return {
     speed: Math.round(planeSpeed(plane)),
     altitude: Math.max(0, Math.round(groundY(plane.x) - plane.y)),
     stalled: plane.stalled,
+    protected: plane.invulnerableFor > 0,
     alive: plane.alive,
     respawnIn: Math.max(0, plane.respawnIn),
   };

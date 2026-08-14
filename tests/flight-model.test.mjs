@@ -80,3 +80,68 @@ test("a genuine low-speed stall can recover by pointing the nose down", () => {
   assert.equal(plane.deaths, 0, "the aircraft crashed before recovery");
   assert.ok(planeSpeed(plane) > 102, "recovery happened without rebuilding airspeed");
 });
+
+test("flashing respawns can neither shoot nor be shot", () => {
+  const state = createGame();
+  const protectedPlane = addPlayer(state, "protected", "SAFE");
+  const attacker = addPlayer(state, "attacker", "ATTACKER");
+  attacker.invulnerableFor = 0;
+
+  stepGame(state, { protected: { turn: 0, fire: true } }, FRAME);
+  assert.equal(state.bullets.length, 0, "a protected plane fired a bullet");
+
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: protectedPlane.x,
+    y: protectedPlane.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(protectedPlane.alive, true, "a protected plane was shot");
+
+  protectedPlane.invulnerableFor = 0;
+  stepGame(state, {}, 0);
+  assert.equal(protectedPlane.alive, false, "the plane remained protected after flashing ended");
+});
+
+test("team rooms balance automatic choices and prevent friendly fire", () => {
+  const state = createGame("teams");
+  const redOne = addPlayer(state, "red-one", "RED ONE", 0);
+  const redTwo = addPlayer(state, "red-two", "RED TWO", 0);
+  const green = addPlayer(state, "green", "GREEN", "auto");
+  redOne.invulnerableFor = 0;
+  redTwo.invulnerableFor = 0;
+  green.invulnerableFor = 0;
+
+  assert.equal(redOne.team, 0);
+  assert.equal(redTwo.team, 0);
+  assert.equal(green.team, 1);
+
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: redOne.id,
+    x: redTwo.x,
+    y: redTwo.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(redTwo.alive, true, "friendly fire damaged a teammate");
+
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: redOne.id,
+    x: green.x,
+    y: green.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(green.alive, false, "an opposing team could not be shot");
+  assert.equal(redOne.score, 1);
+});

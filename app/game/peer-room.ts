@@ -188,9 +188,6 @@ export class PeerRoom {
     peer.channel = channel;
     channel.onopen = () => {
       this.onPeerOpen?.(peerId, this.peerNames.get(peerId));
-      if (!this.info.isHost) {
-        channel.send(JSON.stringify({ type: "hello", name: this.info.name }));
-      }
     };
     channel.onmessage = (event) => {
       try {

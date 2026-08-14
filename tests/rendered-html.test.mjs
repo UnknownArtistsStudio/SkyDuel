@@ -26,10 +26,8 @@ test("renders the finished Sky Duel game shell", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Sky Duel — Browser Biplane Dogfights<\/title>/i);
-  assert.match(html, /SKY/);
-  assert.match(html, /DUEL/);
-  assert.match(html, /PRACTICE DUEL/);
-  assert.match(html, /CREATE PRIVATE ROOM/);
+  assert.match(html, /Sky Duel/);
+  assert.match(html, /PRESS START/);
   assert.match(html, /Biplane dogfight arena/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -45,15 +43,18 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   ]);
 
   assert.match(component, /STALL · NOSE DOWN/);
-  assert.match(component, /CREATE PRIVATE ROOM/);
-  assert.match(component, /JOIN A ROOM/);
+  assert.match(component, /SAFE · GUNS OFF/);
+  assert.match(component, /FREE FOR ALL/);
+  assert.match(component, /TEAMS/);
+  assert.match(component, /pixelExplosion/);
   assert.match(core, /MAX_PLAYERS = 6/);
+  assert.match(core, /matchMode/);
   assert.match(core, /STALL_SPEED = 78/);
   assert.match(core, /RECOVERY_SPEED = 102/);
   assert.match(renderer, /drawPixelCloud/);
   assert.match(renderer, /#9b90f4/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
-  assert.match(styles, /--sky: #9b90f4/);
+  assert.match(styles, /--purple: #9b90f4/);
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));

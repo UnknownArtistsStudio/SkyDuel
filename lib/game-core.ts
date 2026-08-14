@@ -4,6 +4,10 @@ export const MAX_PLAYERS = 6;
 export const STALL_SPEED = 78;
 export const RECOVERY_SPEED = 102;
 
+export type MatchMode = "free-for-all" | "teams";
+export type Team = 0 | 1;
+export type TeamPreference = Team | "auto";
+
 const GRAVITY = 68;
 const ENGINE_THRUST = 66;
 const DRAG = 0.00172;
@@ -38,6 +42,7 @@ export type Plane = {
   invulnerableFor: number;
   spawnIndex: number;
   liftSide: 1 | -1;
+  team: Team | null;
 };
 
 export type Bullet = {
@@ -64,9 +69,11 @@ export type GameState = {
   players: Plane[];
   bullets: Bullet[];
   events: GameEvent[];
+  matchMode: MatchMode;
 };
 
 const COLORS = ["#f02b10", "#00ad38", "#ffb20a", "#087bed", "#d43bce", "#f7f5ef"];
+const TEAM_COLORS = ["#f02b10", "#00ad38"] as const;
 
 const SPAWNS = [
   { x: 110, y: 335, angle: 0, speed: 188, liftSide: 1 as const },
@@ -77,7 +84,7 @@ const SPAWNS = [
   { x: 745, y: 495, angle: Math.PI, speed: 196, liftSide: -1 as const },
 ];
 
-export function createGame(): GameState {
+export function createGame(matchMode: MatchMode = "free-for-all"): GameState {
   return {
     time: 0,
     nextBulletId: 1,
@@ -85,14 +92,21 @@ export function createGame(): GameState {
     players: [],
     bullets: [],
     events: [],
+    matchMode,
   };
 }
 
-export function addPlayer(state: GameState, id: string, name: string): Plane {
+export function addPlayer(
+  state: GameState,
+  id: string,
+  name: string,
+  teamPreference: TeamPreference = "auto",
+): Plane {
   const used = new Set(state.players.map((player) => player.spawnIndex));
   const spawnIndex = SPAWNS.findIndex((_, index) => !used.has(index));
   const index = spawnIndex >= 0 ? spawnIndex : state.players.length % SPAWNS.length;
-  const plane = makePlane(id, cleanName(name), index);
+  const team = chooseTeam(state, teamPreference);
+  const plane = makePlane(id, cleanName(name), index, team);
   state.players.push(plane);
   return plane;
 }
@@ -102,12 +116,12 @@ export function removePlayer(state: GameState, id: string) {
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== id);
 }
 
-function makePlane(id: string, name: string, spawnIndex: number): Plane {
+function makePlane(id: string, name: string, spawnIndex: number, team: Team | null): Plane {
   const spawn = SPAWNS[spawnIndex % SPAWNS.length];
   return {
     id,
     name,
-    color: COLORS[spawnIndex % COLORS.length],
+    color: team === null ? COLORS[spawnIndex % COLORS.length] : TEAM_COLORS[team],
     x: spawn.x,
     y: spawn.y,
     vx: Math.cos(spawn.angle) * spawn.speed,
@@ -122,7 +136,16 @@ function makePlane(id: string, name: string, spawnIndex: number): Plane {
     invulnerableFor: 2.2,
     spawnIndex,
     liftSide: spawn.liftSide,
+    team,
   };
+}
+
+function chooseTeam(state: GameState, preference: TeamPreference): Team | null {
+  if (state.matchMode !== "teams") return null;
+  if (preference === 0 || preference === 1) return preference;
+  const red = state.players.filter((plane) => plane.team === 0).length;
+  const green = state.players.filter((plane) => plane.team === 1).length;
+  return red <= green ? 0 : 1;
 }
 
 export function cleanName(name: string): string {
@@ -212,7 +235,7 @@ export function stepGame(
       plane.vy = Math.max(18, plane.vy);
     }
 
-    if (input.fire && plane.fireCooldown <= 0) fireBullet(state, plane);
+    if (input.fire && plane.fireCooldown <= 0 && plane.invulnerableFor <= 0) fireBullet(state, plane);
 
     if (plane.y + PLANE_RADIUS >= groundY(plane.x)) {
       destroyPlane(state, plane, undefined);
@@ -250,12 +273,13 @@ function updateBullets(state: GameState, dt: number) {
     if (bullet.life <= 0 || bullet.y < 0 || bullet.y >= groundY(bullet.x)) continue;
 
     let hit = false;
+    const shooter = state.players.find((candidate) => candidate.id === bullet.ownerId);
     for (const plane of state.players) {
       if (!plane.alive || plane.id === bullet.ownerId || plane.invulnerableFor > 0) continue;
+      if (shooter && areTeammates(state, shooter, plane)) continue;
       const dx = wrappedDistance(bullet.x, plane.x);
       const dy = bullet.y - plane.y;
       if (dx * dx + dy * dy < 12 * 12) {
-        const shooter = state.players.find((candidate) => candidate.id === bullet.ownerId);
         if (shooter) shooter.score += 1;
         destroyPlane(state, plane, bullet.ownerId);
         if (shooter) pushEvent(state, "score", shooter.id, plane.id);
@@ -274,7 +298,7 @@ function updatePlaneCollisions(state: GameState) {
     if (!a.alive || a.invulnerableFor > 0) continue;
     for (let j = i + 1; j < state.players.length; j += 1) {
       const b = state.players[j];
-      if (!b.alive || b.invulnerableFor > 0) continue;
+      if (!b.alive || b.invulnerableFor > 0 || areTeammates(state, a, b)) continue;
       const dx = wrappedDistance(a.x, b.x);
       const dy = a.y - b.y;
       if (dx * dx + dy * dy < 19 * 19) {
@@ -324,7 +348,9 @@ function pushEvent(
 export function botInput(state: GameState, botId: string): PilotInput {
   const bot = state.players.find((player) => player.id === botId);
   if (!bot || !bot.alive) return { turn: 0, fire: false };
-  const opponents = state.players.filter((player) => player.id !== botId && player.alive);
+  const opponents = state.players.filter(
+    (player) => player.id !== botId && player.alive && !areTeammates(state, bot, player),
+  );
   const target = opponents.sort((a, b) => distanceSquared(bot, a) - distanceSquared(bot, b))[0];
 
   const weave = Math.sin(state.time * 0.62 + bot.spawnIndex * 1.9) * 0.14;
@@ -349,6 +375,10 @@ function distanceSquared(a: Plane, b: Plane): number {
   const dx = wrappedDistance(b.x, a.x);
   const dy = b.y - a.y;
   return dx * dx + dy * dy;
+}
+
+function areTeammates(state: GameState, a: Plane, b: Plane): boolean {
+  return state.matchMode === "teams" && a.team !== null && a.team === b.team;
 }
 
 function wrappedDistance(targetX: number, originX: number): number {

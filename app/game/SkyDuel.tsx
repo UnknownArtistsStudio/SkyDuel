@@ -9,18 +9,23 @@ import {
   removePlayer,
   stepGame,
   type GameState,
+  type MatchMode,
   type PilotInput,
+  type Plane,
+  type Team,
+  type TeamPreference,
 } from "../../lib/game-core";
 import { PeerRoom } from "./peer-room";
 import { pilotReadout, renderGame } from "./render-game";
 
-type Screen = "menu" | "join" | "connecting" | "playing";
+type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
 type NetworkMessage =
-  | { type: "hello"; name: string }
+  | { type: "hello"; name: string; teamPreference: TeamPreference }
   | { type: "input"; input: PilotInput }
   | { type: "welcome"; playerId: string; state: GameState }
   | { type: "snapshot"; state: GameState };
+type EngineSound = { oscillator: OscillatorNode; gain: GainNode };
 
 const neutralInput: PilotInput = { turn: 0, fire: false };
 
@@ -33,9 +38,12 @@ export function SkyDuel() {
   const remoteInputsRef = useRef<Record<string, PilotInput>>({});
   const lastSoundEventRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
+  const engineSoundRef = useRef<EngineSound | null>(null);
 
-  const [screen, setScreen] = useState<Screen>("menu");
+  const [screen, setScreen] = useState<Screen>("title");
   const [mode, setMode] = useState<Mode>(null);
+  const [matchMode, setMatchMode] = useState<MatchMode>("free-for-all");
+  const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
   const [callsign, setCallsign] = useState("ACE");
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -43,28 +51,31 @@ export function SkyDuel() {
   const [error, setError] = useState("");
   const [hud, setHud] = useState<{
     readout: ReturnType<typeof pilotReadout>;
-    pilots: Array<{ id: string; name: string; color: string; score: number }>;
+    pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null }>;
   }>({
-    readout: { speed: 0, altitude: 0, stalled: false, alive: false, respawnIn: 0 },
+    readout: { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0 },
     pilots: [],
   });
   const [copied, setCopied] = useState(false);
 
   const { readout, pilots } = hud;
 
-  const setupRoom = useCallback((room: PeerRoom, role: "host" | "guest") => {
+  const setupRoom = useCallback((
+    room: PeerRoom,
+    role: "host" | "guest",
+    localName: string,
+    requestedTeam: TeamPreference,
+  ) => {
     room.onStatus = (status) => setMessage(status);
     room.onPeerOpen = (peerId, name) => {
-      if (role !== "host") return;
-      if (!gameRef.current.players.some((player) => player.id === peerId)) {
-        addPlayer(gameRef.current, peerId, name ?? "PILOT");
+      if (role === "guest" && peerId === room.info.hostPeerId) {
+        room.sendToHost({
+          type: "hello",
+          name: localName,
+          teamPreference: requestedTeam,
+        } satisfies NetworkMessage);
       }
-      room.sendTo(peerId, {
-        type: "welcome",
-        playerId: peerId,
-        state: gameRef.current,
-      } satisfies NetworkMessage);
-      setMessage(`${cleanName(name ?? "PILOT")} joined the formation.`);
+      if (role === "host") setMessage(`${cleanName(name ?? "PILOT")} is joining…`);
     };
     room.onPeerClose = (peerId) => {
       if (role === "host") {
@@ -81,12 +92,25 @@ export function SkyDuel() {
     room.onMessage = (peerId, rawMessage) => {
       const incoming = rawMessage as NetworkMessage;
       if (!incoming || typeof incoming !== "object" || !("type" in incoming)) return;
+      if (role === "host" && incoming.type === "hello") {
+        if (!gameRef.current.players.some((player) => player.id === peerId)) {
+          addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference);
+        }
+        room.sendTo(peerId, {
+          type: "welcome",
+          playerId: peerId,
+          state: gameRef.current,
+        } satisfies NetworkMessage);
+        setMessage(`${cleanName(incoming.name)} joined the formation.`);
+      }
       if (role === "host" && incoming.type === "input") {
         remoteInputsRef.current[peerId] = sanitizeInput(incoming.input);
       }
       if (role === "guest" && incoming.type === "welcome") {
         localIdRef.current = incoming.playerId;
         gameRef.current = incoming.state;
+        lastSoundEventRef.current = 0;
+        setMatchMode(incoming.state.matchMode);
         setMode("guest");
         setScreen("playing");
         setMessage("Connected. Watch your airspeed.");
@@ -97,14 +121,20 @@ export function SkyDuel() {
     };
   }, []);
 
+  const pressStart = useCallback(() => {
+    wakeAudio(audioRef, engineSoundRef);
+    setScreen("menu");
+  }, []);
+
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame();
+    const state = createGame("free-for-all");
     const playerId = `pilot-${crypto.randomUUID()}`;
     addPlayer(state, playerId, cleanName(callsign));
     addPlayer(state, "practice-rival", "RIVAL");
     gameRef.current = state;
+    lastSoundEventRef.current = 0;
     localIdRef.current = playerId;
     remoteInputsRef.current = {};
     inputRef.current = { ...neutralInput };
@@ -113,23 +143,24 @@ export function SkyDuel() {
     setMessage("Open-ended practice duel · scores keep running.");
     setError("");
     setScreen("playing");
-    wakeAudio(audioRef);
+    wakeAudio(audioRef, engineSoundRef);
   }, [callsign]);
 
   const createRoom = useCallback(async () => {
     setError("");
     setMessage("Calling the tower…");
     setScreen("connecting");
-    wakeAudio(audioRef);
+    wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame();
-      addPlayer(state, room.info.peerId, room.info.name);
+      const state = createGame(matchMode);
+      addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
+      lastSoundEventRef.current = 0;
       localIdRef.current = room.info.peerId;
       roomRef.current = room;
       remoteInputsRef.current = {};
-      setupRoom(room, "host");
+      setupRoom(room, "host", cleanName(callsign), teamPreference);
       setMode("host");
       setRoomCode(room.info.code);
       setMessage("Room open. Share the four-letter code.");
@@ -138,7 +169,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [callsign, setupRoom]);
+  }, [callsign, matchMode, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -149,12 +180,12 @@ export function SkyDuel() {
     setError("");
     setMessage("Looking for that formation…");
     setScreen("connecting");
-    wakeAudio(audioRef);
+    wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.join(code, cleanName(callsign));
       roomRef.current = room;
       localIdRef.current = room.info.peerId;
-      setupRoom(room, "guest");
+      setupRoom(room, "guest", cleanName(callsign), teamPreference);
       setRoomCode(room.info.code);
       setMode("guest");
       setMessage("Negotiating a direct connection to the lead pilot…");
@@ -162,12 +193,13 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "That room could not be joined.");
       setScreen("join");
     }
-  }, [callsign, joinCode, setupRoom]);
+  }, [callsign, joinCode, setupRoom, teamPreference]);
 
   const leaveGame = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
     gameRef.current = makeAttractGame();
+    lastSoundEventRef.current = 0;
     localIdRef.current = "";
     inputRef.current = { ...neutralInput };
     remoteInputsRef.current = {};
@@ -189,8 +221,14 @@ export function SkyDuel() {
     };
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
+      if (key === "enter" && screen === "title") {
+        event.preventDefault();
+        pressStart();
+        return;
+      }
       if (["a", "d", "w", "s", "arrowleft", "arrowright", "arrowup", "arrowdown", " ", "enter"].includes(key)) {
         if (screen === "playing") event.preventDefault();
+        if (screen === "playing") void audioRef.current?.resume();
         keys.add(key);
         refreshInput();
       }
@@ -207,7 +245,7 @@ export function SkyDuel() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [leaveGame, screen]);
+  }, [leaveGame, pressStart, screen]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -242,13 +280,15 @@ export function SkyDuel() {
         lastBroadcast = time;
       }
 
+      const localPlane = state.players.find((plane) => plane.id === localIdRef.current);
+      updateEngineSound(audioRef.current, engineSoundRef.current, localPlane, screen === "playing");
       playNewSounds(state, lastSoundEventRef, audioRef);
       if (canvasRef.current) renderGame(canvasRef.current, state, localIdRef.current, time);
       if (time - lastHud > 100) {
         setHud({
           readout: pilotReadout(state, localIdRef.current),
           pilots: state.players
-            .map(({ id, name, color, score }) => ({ id, name, color, score }))
+            .map(({ id, name, color, score, team }) => ({ id, name, color, score, team }))
             .sort((a, b) => b.score - a.score),
         });
         lastHud = time;
@@ -259,9 +299,14 @@ export function SkyDuel() {
     return () => cancelAnimationFrame(animationFrame);
   }, [mode, screen]);
 
-  useEffect(() => () => void roomRef.current?.close(), []);
+  useEffect(() => () => {
+    void roomRef.current?.close();
+    engineSoundRef.current?.oscillator.stop();
+    void audioRef.current?.close();
+  }, []);
 
   const touchControl = (field: "left" | "right" | "fire", pressed: boolean) => {
+    if (pressed) void audioRef.current?.resume();
     if (field === "fire") inputRef.current = { ...inputRef.current, fire: pressed };
     if (field === "left") inputRef.current = { ...inputRef.current, turn: pressed ? -1 : 0 };
     if (field === "right") inputRef.current = { ...inputRef.current, turn: pressed ? 1 : 0 };
@@ -274,166 +319,192 @@ export function SkyDuel() {
   };
 
   return (
-    <main className="site-shell">
-      <header className="masthead">
-        <div className="brand-lockup" aria-label="Sky Duel">
-          <span className="brand-kicker">BIPLANE COMBAT · 2–6 PILOTS</span>
-          <h1>SKY <i>DUEL</i></h1>
-        </div>
-        <p className="masthead-note">Full power. Open sky. No upgrades.</p>
-      </header>
+    <main className={`game-root screen-${screen}`}>
+      <section className="game-screen" aria-label="Sky Duel game">
+        <canvas ref={canvasRef} className="game-canvas" aria-label="Biplane dogfight arena" />
 
-      <section className="game-cabinet" aria-label="Sky Duel game">
-        <div className="cabinet-topline">
-          <span>{screen === "playing" ? modeLabel(mode) : "AIRFIELD 01"}</span>
-          <span className="status-copy">{message}</span>
-          <span>{roomCode ? `ROOM ${roomCode}` : "CLEAR SKIES"}</span>
-        </div>
+        {screen === "title" && (
+          <div className="title-screen">
+            <button type="button" onClick={pressStart}>PRESS START</button>
+          </div>
+        )}
 
-        <div className="screen-bezel">
-          <canvas ref={canvasRef} className="game-canvas" aria-label="Biplane dogfight arena" />
-
-          {screen === "playing" && (
-            <>
-              <div className="scoreboard" aria-label="Pilot scores">
-                {pilots.map((pilot) => (
-                  <div className="score-row" key={pilot.id} style={{ "--pilot": pilot.color } as React.CSSProperties}>
-                    <span className="pilot-dot" />
-                    <span className="pilot-name">{pilot.name}</span>
-                    <strong>{pilot.score}</strong>
-                  </div>
-                ))}
-              </div>
-
-              {roomCode && (
-                <button className="room-ticket" type="button" onClick={copyCode} aria-label="Copy room code">
-                  <span>{copied ? "COPIED" : "ROOM CODE"}</span>
-                  <strong>{roomCode}</strong>
-                </button>
-              )}
-
-              <div className={`flight-readout ${readout.stalled ? "is-stalled" : ""}`}>
-                <span>AIRSPEED <strong>{readout.speed}</strong></span>
-                <span>{readout.stalled ? "STALL · NOSE DOWN" : "LIFT GOOD"}</span>
-                <span>ALT <strong>{readout.altitude}</strong></span>
-              </div>
-
-              {!readout.alive && (
-                <div className="respawn-card">
-                  <span>SHOT DOWN</span>
-                  <strong>BACK IN {Math.ceil(readout.respawnIn)}</strong>
-                </div>
-              )}
-
-              <div className="touch-controls" aria-label="Touch flight controls">
-                <button
-                  type="button"
-                  aria-label="Rotate left"
-                  onPointerDown={() => touchControl("left", true)}
-                  onPointerUp={() => touchControl("left", false)}
-                  onPointerCancel={() => touchControl("left", false)}
-                >
-                  ↶
-                </button>
-                <button
-                  className="touch-fire"
-                  type="button"
-                  aria-label="Fire"
-                  onPointerDown={() => touchControl("fire", true)}
-                  onPointerUp={() => touchControl("fire", false)}
-                  onPointerCancel={() => touchControl("fire", false)}
-                >
-                  FIRE
-                </button>
-                <button
-                  type="button"
-                  aria-label="Rotate right"
-                  onPointerDown={() => touchControl("right", true)}
-                  onPointerUp={() => touchControl("right", false)}
-                  onPointerCancel={() => touchControl("right", false)}
-                >
-                  ↷
-                </button>
-              </div>
-            </>
-          )}
-
-          {screen !== "playing" && (
-            <div className="hangar-overlay">
-              {screen === "menu" && (
-                <div className="menu-card">
-                  <p className="menu-eyebrow">THE OLD RULES</p>
-                  <h2>CLIMB. TURN.<br />FIRE.</h2>
-                  <p className="menu-intro">
-                    The engine stays on and scores keep running. Climb hard, but lose too much speed and you will stall.
-                  </p>
-                  <label className="callsign-field">
-                    <span>CALL SIGN</span>
-                    <input
-                      value={callsign}
-                      maxLength={12}
-                      onChange={(event) => setCallsign(event.target.value)}
-                      onBlur={() => setCallsign(cleanName(callsign))}
-                      autoComplete="off"
-                    />
-                  </label>
-                  <div className="menu-actions">
-                    <button className="button-primary" type="button" onClick={beginPractice}>PRACTICE DUEL</button>
-                    <button type="button" onClick={createRoom}>CREATE PRIVATE ROOM</button>
-                    <button type="button" onClick={() => { setError(""); setScreen("join"); }}>JOIN A ROOM</button>
-                  </div>
-                  {error && <p className="form-error" role="alert">{error}</p>}
-                </div>
-              )}
-
-              {screen === "join" && (
-                <div className="menu-card join-card">
-                  <p className="menu-eyebrow">JOIN A FORMATION</p>
-                  <h2>Room code</h2>
-                  <p className="menu-intro">Ask the lead pilot for the four letters shown over their airfield.</p>
-                  <label className="callsign-field room-code-field">
-                    <span>FOUR LETTERS</span>
-                    <input
-                      value={joinCode}
-                      maxLength={4}
-                      placeholder="WING"
-                      onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
-                      onKeyDown={(event) => { if (event.key === "Enter") void joinRoom(); }}
-                    />
-                  </label>
-                  <div className="menu-actions two-up">
-                    <button className="button-primary" type="button" onClick={joinRoom}>JOIN ROOM</button>
-                    <button type="button" onClick={() => setScreen("menu")}>BACK</button>
-                  </div>
-                  {error && <p className="form-error" role="alert">{error}</p>}
-                </div>
-              )}
-
-              {screen === "connecting" && (
-                <div className="menu-card connecting-card" role="status">
-                  <span className="radar-sweep" />
-                  <p className="menu-eyebrow">RADIO CHECK</p>
-                  <h2>{message}</h2>
-                  <button type="button" onClick={leaveGame}>CANCEL</button>
-                </div>
-              )}
+        {screen === "playing" && (
+          <>
+            <div className="game-mode-label">
+              {modeLabel(mode)} · {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"}
             </div>
-          )}
-        </div>
+            <div className="scoreboard" aria-label="Pilot scores">
+              {matchMode === "teams" && mode !== "practice" && (
+                <div className="team-score">
+                  <span>RED {pilots.filter((pilot) => pilot.team === 0).reduce((total, pilot) => total + pilot.score, 0)}</span>
+                  <span>GREEN {pilots.filter((pilot) => pilot.team === 1).reduce((total, pilot) => total + pilot.score, 0)}</span>
+                </div>
+              )}
+              {pilots.map((pilot) => (
+                <div className="score-row" key={pilot.id} style={{ "--pilot": pilot.color } as React.CSSProperties}>
+                  <span className="pilot-dot" />
+                  <span className="pilot-name">{pilot.name}</span>
+                  <span className="pilot-team">{pilot.team === null ? "" : pilot.team === 0 ? "R" : "G"}</span>
+                  <strong>{pilot.score}</strong>
+                </div>
+              ))}
+            </div>
 
-        <div className="cabinet-controls">
-          <div><kbd>A</kbd><kbd>D</kbd><span>ROTATE</span></div>
-          <div><kbd>SPACE</kbd><span>FIRE</span></div>
-          <div className="stall-note"><span>STALL RECOVERY</span><strong>Point the nose down. Rebuild speed. Ease back.</strong></div>
-          {screen === "playing" && <button type="button" onClick={leaveGame}>LEAVE AIRFIELD</button>}
-        </div>
+            {roomCode && (
+              <button className="room-ticket" type="button" onClick={copyCode} aria-label="Copy room code">
+                <span>{copied ? "COPIED" : "ROOM"}</span>
+                <strong>{roomCode}</strong>
+              </button>
+            )}
+
+            <div className={`flight-readout ${readout.stalled ? "is-stalled" : ""}`}>
+              <span>SPEED <strong>{readout.speed}</strong></span>
+              <span>
+                {readout.protected ? "SAFE · GUNS OFF" : readout.stalled ? "STALL · NOSE DOWN" : "A D TURN · SPACE FIRE"}
+              </span>
+              <span>ALT <strong>{readout.altitude}</strong></span>
+            </div>
+
+            {!readout.alive && (
+              <div className="respawn-card">
+                <span>SHOT DOWN</span>
+                <strong>BACK IN {Math.ceil(readout.respawnIn)}</strong>
+              </div>
+            )}
+
+            <button className="leave-button" type="button" onClick={leaveGame}>QUIT</button>
+
+            <div className="touch-controls" aria-label="Touch flight controls">
+              <button
+                type="button"
+                aria-label="Rotate left"
+                onPointerDown={() => touchControl("left", true)}
+                onPointerUp={() => touchControl("left", false)}
+                onPointerCancel={() => touchControl("left", false)}
+              >
+                ↶
+              </button>
+              <button
+                className="touch-fire"
+                type="button"
+                aria-label="Fire"
+                onPointerDown={() => touchControl("fire", true)}
+                onPointerUp={() => touchControl("fire", false)}
+                onPointerCancel={() => touchControl("fire", false)}
+              >
+                FIRE
+              </button>
+              <button
+                type="button"
+                aria-label="Rotate right"
+                onPointerDown={() => touchControl("right", true)}
+                onPointerUp={() => touchControl("right", false)}
+                onPointerCancel={() => touchControl("right", false)}
+              >
+                ↷
+              </button>
+            </div>
+          </>
+        )}
+
+        {screen !== "title" && screen !== "playing" && (
+          <div className="hangar-overlay">
+            {screen === "menu" && (
+              <div className="menu-card">
+                <p className="menu-eyebrow">SKY DUEL · 2–6 PILOTS</p>
+                <h1>SELECT GAME</h1>
+                <label className="callsign-field">
+                  <span>CALL SIGN</span>
+                  <input
+                    value={callsign}
+                    maxLength={12}
+                    onChange={(event) => setCallsign(event.target.value)}
+                    onBlur={() => setCallsign(cleanName(callsign))}
+                    autoComplete="off"
+                  />
+                </label>
+                <div className="choice-group" role="group" aria-label="Room rules">
+                  <span>ROOM RULES</span>
+                  <button
+                    type="button"
+                    aria-pressed={matchMode === "free-for-all"}
+                    onClick={() => setMatchMode("free-for-all")}
+                  >
+                    FREE FOR ALL
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={matchMode === "teams"}
+                    onClick={() => setMatchMode("teams")}
+                  >
+                    TEAMS
+                  </button>
+                </div>
+                {matchMode === "teams" && (
+                  <TeamPicker value={teamPreference} onChange={setTeamPreference} />
+                )}
+                <div className="menu-actions">
+                  <button type="button" onClick={beginPractice}>PRACTICE</button>
+                  <button className="button-primary" type="button" onClick={createRoom}>CREATE ROOM</button>
+                  <button type="button" onClick={() => { setError(""); setScreen("join"); }}>JOIN ROOM</button>
+                </div>
+                {error && <p className="form-error" role="alert">{error}</p>}
+              </div>
+            )}
+
+            {screen === "join" && (
+              <div className="menu-card join-card">
+                <p className="menu-eyebrow">JOIN ROOM</p>
+                <h1>ENTER CODE</h1>
+                <label className="callsign-field room-code-field">
+                  <span>FOUR LETTERS</span>
+                  <input
+                    value={joinCode}
+                    maxLength={4}
+                    placeholder="WING"
+                    onChange={(event) => setJoinCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+                    onKeyDown={(event) => { if (event.key === "Enter") void joinRoom(); }}
+                  />
+                </label>
+                <TeamPicker value={teamPreference} onChange={setTeamPreference} />
+                <p className="menu-intro">Team choice is used when the room is playing teams.</p>
+                <div className="menu-actions two-up">
+                  <button className="button-primary" type="button" onClick={joinRoom}>JOIN</button>
+                  <button type="button" onClick={() => setScreen("menu")}>BACK</button>
+                </div>
+                {error && <p className="form-error" role="alert">{error}</p>}
+              </div>
+            )}
+
+            {screen === "connecting" && (
+              <div className="menu-card connecting-card" role="status">
+                <p className="menu-eyebrow">RADIO CHECK</p>
+                <h1>{message}</h1>
+                <button type="button" onClick={leaveGame}>CANCEL</button>
+              </div>
+            )}
+          </div>
+        )}
       </section>
-
-      <footer className="site-footer">
-        <p>An original browser homage to early console dogfights.</p>
-        <p>Private rooms connect pilots directly. The lead pilot keeps the match in sync.</p>
-      </footer>
     </main>
+  );
+}
+
+function TeamPicker({
+  value,
+  onChange,
+}: {
+  value: TeamPreference;
+  onChange: (team: TeamPreference) => void;
+}) {
+  return (
+    <div className="choice-group team-picker" role="group" aria-label="Team choice">
+      <span>YOUR TEAM</span>
+      <button type="button" aria-pressed={value === "auto"} onClick={() => onChange("auto")}>AUTO</button>
+      <button type="button" aria-pressed={value === 0} onClick={() => onChange(0)}>RED</button>
+      <button type="button" aria-pressed={value === 1} onClick={() => onChange(1)}>GREEN</button>
+    </div>
   );
 }
 
@@ -458,10 +529,36 @@ function modeLabel(mode: Mode) {
   return "AIRFIELD 01";
 }
 
-function wakeAudio(audioRef: React.MutableRefObject<AudioContext | null>) {
+function wakeAudio(
+  audioRef: React.MutableRefObject<AudioContext | null>,
+  engineSoundRef: React.MutableRefObject<EngineSound | null>,
+) {
   if (typeof window === "undefined" || !("AudioContext" in window)) return;
   audioRef.current ??= new AudioContext();
+  if (!engineSoundRef.current) {
+    const oscillator = audioRef.current.createOscillator();
+    const gain = audioRef.current.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.value = 58;
+    gain.gain.value = 0.0001;
+    oscillator.connect(gain).connect(audioRef.current.destination);
+    oscillator.start();
+    engineSoundRef.current = { oscillator, gain };
+  }
   void audioRef.current.resume();
+}
+
+function updateEngineSound(
+  context: AudioContext | null,
+  engine: EngineSound | null,
+  plane: Plane | undefined,
+  playing: boolean,
+) {
+  if (!context || !engine) return;
+  const active = Boolean(playing && plane?.alive);
+  const speed = plane ? Math.min(240, Math.hypot(plane.vx, plane.vy)) : 0;
+  engine.oscillator.frequency.setTargetAtTime(44 + speed * 0.09, context.currentTime, 0.08);
+  engine.gain.gain.setTargetAtTime(active ? 0.014 : 0.0001, context.currentTime, 0.06);
 }
 
 function playNewSounds(
@@ -474,12 +571,34 @@ function playNewSounds(
   for (const event of state.events) {
     if (event.id <= lastEventRef.current) continue;
     lastEventRef.current = event.id;
-    if (event.type === "shot" && event.playerId === state.players.find((p) => p.id === event.playerId)?.id) {
-      tone(context, 180, 0.035, "square", 0.018);
-    }
-    if (event.type === "crash") tone(context, 64, 0.22, "sawtooth", 0.055);
+    if (event.type === "shot") tone(context, 210, 0.028, "square", 0.016);
+    if (event.type === "crash") pixelExplosion(context);
     if (event.type === "stall") tone(context, 120, 0.12, "triangle", 0.025);
   }
+}
+
+function pixelExplosion(context: AudioContext) {
+  const duration = 0.34;
+  const frameCount = Math.floor(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  let held = 0;
+  for (let index = 0; index < frameCount; index += 1) {
+    if (index % 11 === 0) held = Math.round((Math.random() * 2 - 1) * 4) / 4;
+    const envelope = Math.pow(1 - index / frameCount, 1.7);
+    samples[index] = held * envelope;
+  }
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  filter.type = "bandpass";
+  filter.frequency.value = 1250;
+  filter.Q.value = 0.55;
+  gain.gain.value = 0.12;
+  source.connect(filter).connect(gain).connect(context.destination);
+  source.start();
+  tone(context, 92, 0.2, "square", 0.038);
 }
 
 function tone(context: AudioContext, frequency: number, duration: number, type: OscillatorType, volume: number) {
