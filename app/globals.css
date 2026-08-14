@@ -1,4 +1,10 @@
-@import "tailwindcss";
+@font-face {
+  font-family: "SkyDuelPixel";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("data:font/woff2;base64,d09GMgABAAAAABJgAA0AAAAASFgAABILAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYcgzwGYACEbBEICvB00n4Lg0QAATYCJAOGdAQgBYRKB4ReG7k2IxE1HRM1iOA/JWg2xvD6obMqmE5SN4m6JErQGe1cnR7tTm21roiCRXGDph2W57zlE2hWfkyCDRZhurA4QpJZeJ7fH3Xufd9jvYGwAJrkBDcnoU4JS7aJ6zQ4wEsveVcau6YSMNkW5dRZkKLO7kl2gJ99Pu1cgBXilsXzxNXe312wJuAISuQ69LpAmygPOJGMosbv9O8fKPBxUDdsnCIs31VPLCJq8pmJK+q+O4R4UVF6lcpGGsmA+ctVGunAV3/7FmaFSTNZmPJ92eQtKF2y1Rr6/y1N6Yx01bXAVlgCUKk8KMZpgFl/5u/37Gi0sVYrvVtZ7nK74tp2Vme/ldxrAoNKh86llIYaDKq0FUKDyIWF4gAe22ycgtZjjJuJs/Vp39+v74B3YB+yQ62hxBJjrLUTa+Sy99Pd99cEAbEAQLyFMgwBkam6oK3xU+ciNfPcvhE6mZDmqLkWqDD0n1OuQAhC9KYOn4NBoU/niabLNmzGoo/+xw1ug9G9ztasWoJO56Zl61ETp6VJm7R+cvD8ZkwUIyroOEAERD5UKipJnfOhLrSmENhSWc6QqDOfQyh0tj+jiuXZ/8PnSYaaAyFm4rtroNK5XussnBuyoeJ5zoC6dKczmSccloW4oypBxUAoF5sxFQLcirAInR1MZjcgX4k1EysGSJ2M5k6neut6/27mwJd9UgEBelYHgCn+hjJAKlssT6Nb+z7hmPbscWyAorp5AYB5SJwFuA5AnyFHrMaflApHNJ7x+9UCg5cKiFNPUZr/iKRY64ru6S29YxCbarNtvi2yZbbLjsVGDlfh+VP9sQ79ByCOJUFJRyTFKnpWsDWbaXOvr/N7If+vgBkAhrjBYK4NDee34PsV+L4WIZYBuvuPvincl783AAKgATDVFSAXRr6c3JrN/3HGVa0aLTpwRps+/SqsqTWkSYca7bZt2tLsNLxYcRIkYXPIYUecwAHDhRsvUeIkSJIiTYEiJcpU9ajU66pOd6nRo8+QMQuWrFhz5MSZKzceAgQJFiJMuBix4sRL0uWybrvmNJi3bMGKK86547xUI/YMu+CeS3YUKXbTvrOq3FIozagypcq1IHN5Ir5QjHhpmDBjwe6oY45jwEMQH37CBKwTIk+GLDkqxITSok6DDk3adBkwZ8KUGQe27Ngz4s6HJy9+vG3wFS1CpCgJAiUS4W/QgElTJiDk/98A4AcAuQPyAZJ2ACkvAB6oAIABACppDAYfuDIBBwdtvWyhIRj9eiPiRtE2zhO4kUR6xplwhByIGdHEfl2lnhqraTbpW3ibCwPlFbCkAFDqFEs+ouId4rDYFIx3Rgp1JviWVtp0gLoZoOHhudAa3lXMO58l1rNuCTB3bALXXGnb/nuVbib5zIAjGHU0I+vqIX3dp0pfZIhBAJldd9NXY27Td77KTu2odNh1bNd/MmxWU60SgwDYrbYVsG5SAHPc3OnXRDqZZx5AN4/b+QP23IQU1ololz89jHe+3vpcMkt0lwM/573pXzp9PbXfizZscl0ELXO3a1UbZW84hcdS+ygg252g2kqvjynC9Zz5uT51374IQGxoIViy+r1aO2cyM1kuabuu5YAzwR0QDOVNMNfejiJ58vbRAC0ACLPuM673tXdTiQJqCKUJCSkIhFMSVoRCcGriaPVLaSFOCpqoMooEDSlcYkRUz4XwkApimZR+FhfXwZA7MYXyScHaPDaFYc9ss7gM5ZYs1QwfQMYZkEJYRVaGwLrE3ZDOqopH0WKhrKYyn5jgFnBKR8aVHwy1EDwOxPWwMKq6LAwr4eYDjbhnmEePgsSAzHtLsGN2LkSLRIgzniTDyUNzR6G8Ek9CE6wMyORehlJUVkKLRUvDhjbMGHMpCvC6v2xgNRXAwggUCRJ7PYSgTV5RpEvG1kdpwglup8CaTjp0/tZdr1688A6jRiAAYkX2jYaGI2yEUED4agQ4JpDdlCU2KgqlAuYHCKlez0mlj0QvcpGO1NK3dCvyfsXpVCbst9GllNVsQ/m0ecUNbEvtYUVwoaaijNyRgJRbfvMoDLqOhDUhD6bAXNSUZNyJX5IekmQF0UTzLC7AZFlcCQmxLmpK1rQZ1SDkaC+d0IVasLlKGNSTvKgXcxoCTsoYtZLGBXO0cUdZAhJxAg+O4C9r2GC83qogpN6xJx2xIGwwFrEk9VR+tHKBggk6U1LmwfkF1dp8yUJX3ga9eH9YtsMWX5wQqUZ21yGWFNq9ajBoEVsoSz36d5cSzFLbAJZ5HBsmU2S1hKJbU3Wc79U6Nu0xgKAelp0Z4jqLRPumclG2eKPlL+r190iKNpW7y5sA7cqgGMvWIEl+SE0N0tmH8mlGSxpVQE9Urd3YqVrA4oAp+2BKXB2A9K0eTRqj3WAoGXskoL132wA2/MvgLLOL0yqYLSBZEKCPLV8PkjVdB1SZ2IaBQd0U2Dakfm5sFl48kBeNEFPjhuqccG1xKdLMwtZahGBvKKj6sjd4NlQ2UZAigsnBtsxkmBAUrlaQNUGBWoRSctWWPDeHg9iWFt953iW8s41nKaqZgHL5RcUdtBmY0DFS28bLdxTjSGv0Ny4ptkZdtFbyxfXlBPJDC4Ka2InUcWZ417DMcPZAbTE6gjA8DIy0MWAeNVYPa4tlrhwoNDFkIcAYzAytW7JuIRhZsd7KzTSi50qCGnCvLdArficHWmmiCSHD/ERsIt1qdKQoYJHWYU6i20IBgh6JxJBmjvp7VLIwpFuZVnPEYIUCAskhO76ejxt9JGFxxlGRPKmMLhhBMW5gFMreRedqpVDNopuVpA5k2WxxghipqIfCBeIQRbeLoJs/OepnCw3rhRJpLwo3B29Qq6EQM9waX0tDbZe40xbbQ8/Qa5GCtQc+yGI3ByXFWSYyj81HTC3W1zqV4c3rHdDDtnUb32qt2mopLZvM3ZEnvGTljav/AAf3pR20pETliLUD5zAcEqZRuQ9zKv2DmWBzQez4zdVKH+VrRaAdiE1/2ETrXlpfGErt8QoFgzpPFunNUSa4VWFHgoo0idkyGesoICEQZhHswBR91la3rV3gEjWmUsVVpknJ6pmHX/KmF43M4y/mWPbQU4884NT8oSZ5LwGogx9eW6Gg7lmG/eALtL62Cp9ZUfqamgDfQ7nZ8bGexsAjpAPQHi/0A1pEaFHLboEV7d7dlF4Wbk7rt4KwRSduRJ4z0D893esysc4j7AYVAWuIKyXUddVmqQXZGi4jTAKLOSCwevool+taG4JeINVM5C9/6RKRoAwBZkHGFI/KetWPFCwGXCty3kllWldUY5t/MES0hG3Ha/tc6iFbK775b3PmP/6oxozEvPtWJK7CZJoPNvFwsXLq6RSsjK/OMOpSWGfdXTUUFhBOgAJILasEIC5mwLtlTPxoSoULOiJOa+8v6Dv5BrFchoD8fhVln2F87NH/B/mdN+WJ4DnP9UwOEZPJK3/7wNukPDMoq25+jO5DwuuANDPcW1YujJBA9wCSgw/8hen1aZwisQxxavv9nRFeeQ92LxUGPVGqmTPyNfIsbV5bpsOY5Zn7Cg7jmCvvKM055v3uQzHXQLfeJrTPa109NFJ030JNeFlVetcMGlNOVKhvhUzlCtCsKDcCRJFpo5FhHNpN3SVrrjbYoI4HLifJ0rYu4Qb3LM/gr95bjW2mvJxLSMwkrwkCVPbopYjpdwP9xOkFMwa5FkCOe25XVib8XSGvVIU5K1FfIlZ6K1l9nWjBqt8PSMTirPC+1WzipXQWgAeIBGev81ZJnSRzIe9URfVr8idW4VjoLi+ZiXaEr/9mAzAS/Epx1d5AgoU39Q0OqJTKc64NLg31Kbw++PLxlBz11UYvg93MTzlOTfCrms73QWn0HAWZlactcaDAjplYhAX1YEZdo8rBS/IHZ4oHSETVB+rHBwqhStc6AMQk5XmS6yhCfQXDgrAKDHX7EMzXxdeuOGcWDvl+QyTWUV8wt7se4jmo3csmwcjmsUUkxaa+ZH57WZEEC3kbDqgAReeRoFq6CoesJJ6pB6YvQVcBI0VeS3R9p8NLwpdzcbpV3PvfOwhKDol+mGS4O9MwFVeFDXm0AYvD7dgFnYOG3jRV9XiF4FecuOnM8CRU2vpkopbhKx7KfarCpzaTBFlfv/kfJxMN61HC6Xr3REx7WKz1hnFoxwCTW0XLpk0fPXYC1ErjyY/nY9l+Uvt5rkq6dNytY3UsitNePuss4/wnPo8xLKo75akhjLhUPAjjblOpnjfObJI5bvxrdCKY6sI/XycSypfTlSJWcI2PPdg3Xn7OwgjEJh4Y1AejzXCCNtAGaV4nk8eI9z9dXXZARXv7WVklkuvtdphJvRTe0U/xAawWvJyG+RLhGZ0ZFQvz4wgiRfMWkEFuhqeQSccJ5XPBW6YYaQv3qURhivQHhS7J91v2gf+6vPLp79wn47pD1rAckkBiNknOOtbOcYZNonH8SE14tzCdXq2skwcM4mu+UmA+hdubYq/yYFyppJZRX+l5LYV9teDdwZwji+o8AlhWkZsGcQ4YCKMIcGUs6tn8b3Vqj7pi7T67hgd/hShh7hbiYPL0FbuZrb3NaOSleDv2iNecJ0otEvBme7gEwrPYXLSXB37EQEt6DzeEeMkZzjZDR/roZl7PmFX4Hq4fu+9foRncGLo0G1y/iKBLOV/JVrvYj7o1K4r7I4mcsGHwlcXdB0BecrCv2L0r70MMFtGq82yPHwR3CGswxYG/cFaU3rrO4wfB8PP/weaL4HI+jpG83mzQTuLUxB9R14tT8IYJdK/XpC9//2S8K8KHqVj0ESnA+bUYGqY6X3E26L0SM9pa7svsLqooBnhBXsNCjeUndRMo6jx4+7VE0+hjASzwqLDJtGNnUQ4fMWQdebCuCD1XNWMCOuVaNxUhM+4zhH7IfZyPv0hisvibkEXok2mXsfeoI7UvSpznoaMuFDb06f8mAKK2w6lIRDx+F2Gcqyno9hWf5vWbX0x4JiajeI+I/7O6FU68x7ya9w7jfpykm+RvKierpLT/0+5NErUBjlaKu4vcpfux/sh5u+RCfDvt6mtKBeg497nU+xiWEy5rM8Pc99z+Oz7DlPj1MF8j3UgBCcwwsdV3p6jz34Vzb4NQN0uU0xWnpZabXKxZU0dAgauXK2RlmbNGfke9MM7qZ/jC2LKtrTNm6XcnkalivUfIprI24lDRtCxMz0vEURAh4IJlZM7rf4weA+qG0a0cn/xAGWxegACD3pvs54un8q/L9AHwuoH993c8rOp/+yvqRXiCTxEKYPDmtAJAZ43UB2QlyP7rXi+xmH7AtffY69Cf+A8Ul8e/Ac4U/SEfNxVPdx9g09ixNkUj8M3RGN/e1Y5rjgNArt1er3NCr+F9oyeSUJB4dwZSwUCXe63ZRo78IlVqTKX+RRDwgwIaJUi1qQV+rcBKOFKFwMdQQVNErndTVLzvU4zhuqY4asRNcWVzmeKpIKPibRWwWgxNiKBEfN1o3qIEqorR4WKiVUhU4aXy761rTo8Ji1T54pNEsxbDU5QYUiyIsuLLX6yQnbITHUXVV7gwGGliJJzIPom1GuuvB4tG/9Yo0+bIii5lKTbYe/4NtYWLkJiHir+AsHxToANjUzDfXhMhasNwQXx57zs0xUIH5BEi+xbgLZyPRBqSssN9lYID0FcMQSIw8QKjZUZ0dDZVnHb6wOjtgKPTjKdQaQfO1Ruu9aCDodm85ujr8QNIgTJKnLTPyyhvYyrw4uOD30sCfB045TRBQoSJOOOsc84TJUY8uIwpP3/tCy7yd1mlcROkvX0/4bnkKbjiqgDX3rrYUcVrqnQEvk+hgrwzVAfdVDfU94qBiPy9k0iGjBgzcV2MOPFi32komwf/hoZK8C8nUbIUSTqlmmTtHRu27BSy5yBNhkzp73G8PxdvLHG1YVOrNsxYsL4rIt+z+O8NQTzx6fWFr3yD1gjb8rGjdw/ebURJuHQhiORjosWNBzUaqMV6ZgpDyNwxZM26XTNmzZm3EwrHrSIl4oS6UBPvJwswnDhU89QTGoLESTzFKE7LU6xIiWzuXtAMvSQKI6XuuaGMtlvuuln9r0HXdUyWb9ruhCy7+LEb1zRIjFb0m6WapAeP0slL4P+AdTi6pEmqsbXJbM/BtTy3bt20a8fmEN5Rqw//PeH1K/5x23Oq8rId2wcRFUqN1gYA") format("woff2");
+}
 
 :root {
   --black: #17131f;
@@ -25,11 +31,35 @@ body,
 button,
 input {
   color: var(--white);
-  font-family: var(--font-game), monospace;
+  font-family: "SkyDuelPixel";
+  font-weight: 400;
+  font-synthesis: none;
+}
+
+button,
+input {
+  font-size: inherit;
 }
 
 button {
+  padding: 5px 0;
+  border: 0;
+  color: var(--white);
+  background: transparent;
   cursor: pointer;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+button:hover,
+button:focus-visible {
+  color: var(--orange);
+  outline: 0;
+}
+
+h1,
+strong {
+  font-weight: 400;
 }
 
 .game-root {
@@ -38,6 +68,7 @@ button {
   place-items: center;
   padding: clamp(16px, 3vw, 44px);
   background: var(--black);
+  text-transform: uppercase;
 }
 
 .game-screen {
@@ -61,6 +92,7 @@ button {
   display: block;
   width: 100%;
   height: 100%;
+  image-rendering: pixelated;
   touch-action: none;
 }
 
@@ -68,40 +100,22 @@ button {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: end end;
+  place-items: end center;
   padding: 7%;
   background: url("/og.png") center / cover no-repeat;
-}
-
-.title-screen button,
-.menu-card button,
-.winner-card button,
-.room-ticket,
-.leave-button,
-.touch-controls button {
-  min-height: 42px;
-  padding: 10px 15px;
-  border: 4px solid var(--white);
-  border-radius: 0;
-  color: var(--white);
-  background: var(--black);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  image-rendering: pixelated;
 }
 
 .title-screen button {
-  min-width: 200px;
-  border-color: var(--black);
-  color: var(--black);
-  background: var(--orange);
-  font-size: clamp(10px, 1.35vw, 16px);
+  padding: 8px;
+  color: var(--white);
+  font-size: clamp(9px, 1.2vw, 14px);
+  text-align: center;
   animation: blink 1s steps(2, end) infinite;
 }
 
 @keyframes blink {
-  50% { color: var(--orange); }
+  50% { visibility: hidden; }
 }
 
 .hangar-overlay {
@@ -111,12 +125,14 @@ button {
   place-items: center;
   overflow: auto;
   padding: clamp(18px, 4vw, 48px);
-  background: rgba(155, 144, 244, 0.92);
+  background: var(--purple);
 }
 
 .menu-card {
-  width: min(700px, 100%);
+  width: min(790px, 100%);
   color: var(--white);
+  font-size: 9px;
+  line-height: 1.8;
 }
 
 .menu-eyebrow,
@@ -126,149 +142,128 @@ button {
 }
 
 .menu-eyebrow {
-  margin-bottom: 14px;
-  color: var(--black);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  margin-bottom: 18px;
+  color: var(--white);
+  font-size: 11px;
 }
 
 .menu-card h1 {
-  margin-bottom: 26px;
+  margin-bottom: 30px;
   color: var(--white);
-  font-size: clamp(23px, 4vw, 46px);
-  line-height: 1.18;
-  letter-spacing: 0.025em;
+  font-size: clamp(20px, 3.4vw, 39px);
+  line-height: 1.35;
 }
 
-.callsign-field {
+.callsign-field,
+.choice-group {
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 145px repeat(4, minmax(0, 1fr));
+  gap: 8px;
   align-items: center;
-  margin-bottom: 17px;
-  border-bottom: 4px solid var(--white);
+  margin: 8px 0;
 }
 
 .callsign-field span,
 .choice-group > span {
-  color: var(--black);
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-}
-
-.callsign-field input {
-  min-width: 0;
-  padding: 10px 0;
-  border: 0;
-  outline: 0;
-  color: var(--black);
-  background: transparent;
-  font-size: 16px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.callsign-field:focus-within {
-  border-color: var(--black);
-}
-
-.choice-group {
-  display: grid;
-  grid-template-columns: 150px repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  align-items: center;
-  margin: 11px 0;
-}
-
-.score-picker {
-  grid-template-columns: 150px repeat(4, minmax(0, 1fr));
-}
-
-.choice-group button {
-  min-height: 36px;
-  padding: 7px 9px;
-  border-width: 3px;
+  color: var(--white);
   font-size: 8px;
 }
 
+.callsign-field input {
+  grid-column: 2 / -1;
+  min-width: 0;
+  padding: 5px 0;
+  border: 0;
+  outline: 0;
+  color: var(--orange);
+  background: transparent;
+  text-transform: uppercase;
+}
+
+.choice-group button {
+  min-height: 30px;
+  padding: 5px 0;
+  font-size: 8px;
+  text-align: left;
+}
+
 .choice-group button[aria-pressed="true"] {
-  border-color: var(--black);
-  color: var(--black);
-  background: var(--orange);
+  color: var(--orange);
+}
+
+.choice-group button[aria-pressed="true"]::before {
+  content: "> ";
+  white-space: pre;
 }
 
 .menu-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 9px;
-  margin-top: 22px;
+  justify-items: start;
+  gap: 3px;
+  margin-top: 24px;
 }
 
-.menu-actions .button-primary {
-  border-color: var(--black);
-  color: var(--black);
-  background: var(--orange);
+.menu-actions button,
+.connecting-card > button,
+.winner-card button {
+  color: var(--white);
+  font-size: 10px;
 }
 
-.menu-card button:hover,
-.menu-card button:focus-visible,
+.menu-actions button:hover,
+.menu-actions button:focus-visible,
+.connecting-card > button:hover,
+.connecting-card > button:focus-visible,
 .winner-card button:hover,
-.winner-card button:focus-visible,
-.title-screen button:hover,
-.title-screen button:focus-visible,
-.room-ticket:hover,
-.leave-button:hover {
-  outline: 4px solid var(--black);
-  outline-offset: -8px;
+.winner-card button:focus-visible {
+  color: var(--orange);
 }
 
 .join-card {
-  width: min(580px, 100%);
+  width: min(620px, 100%);
 }
 
 .room-code-field {
   display: block;
-  text-align: center;
+  text-align: left;
 }
 
 .room-code-field span {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .room-code-field input {
   width: 100%;
-  font-size: clamp(30px, 7vw, 62px);
-  letter-spacing: 0.22em;
-  text-align: center;
+  font-size: clamp(28px, 6vw, 54px);
+  letter-spacing: 0.16em;
+  text-align: left;
 }
 
 .room-code-field input::placeholder {
-  color: rgba(23, 19, 31, 0.2);
+  color: var(--white);
 }
 
 .menu-intro {
-  margin-top: 12px;
-  color: var(--black);
-  font-size: 8px;
-  line-height: 1.7;
+  margin-top: 13px;
+  color: var(--white);
+  font-size: 7px;
+  line-height: 1.9;
 }
 
 .form-error {
-  margin: 13px 0 0;
+  margin: 14px 0 0;
   color: var(--red);
-  background: var(--white);
-  font-size: 9px;
-  line-height: 1.6;
+  font-size: 8px;
+  line-height: 1.8;
 }
 
 .connecting-card {
-  text-align: center;
+  text-align: left;
 }
 
 .connecting-card h1 {
-  font-size: clamp(18px, 3vw, 34px);
+  font-size: clamp(16px, 2.6vw, 28px);
 }
 
 .scoreboard {
@@ -276,8 +271,9 @@ button {
   top: 13px;
   left: 13px;
   display: grid;
-  gap: 3px;
-  width: 168px;
+  gap: 4px;
+  width: 180px;
+  color: var(--black);
   pointer-events: none;
 }
 
@@ -286,21 +282,16 @@ button {
   grid-template-columns: 8px 1fr 13px 24px;
   gap: 6px;
   align-items: center;
-  min-height: 24px;
-  padding: 4px 6px;
-  color: var(--white);
-  background: var(--black);
-  font-size: 8px;
-  letter-spacing: 0.05em;
+  min-height: 19px;
+  color: var(--black);
+  font-size: 7px;
 }
 
 .team-score {
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  padding: 6px;
-  color: var(--white);
-  background: var(--black);
+  color: var(--black);
   font-size: 7px;
 }
 
@@ -320,7 +311,7 @@ button {
 
 .pilot-name {
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
 }
 
 .pilot-team,
@@ -334,56 +325,54 @@ button {
 
 .game-mode-label {
   position: absolute;
-  top: 14px;
+  top: 16px;
   left: 50%;
-  padding: 7px 9px;
   color: var(--black);
-  background: var(--white);
-  font-size: 8px;
-  font-weight: 900;
+  font-size: 7px;
   transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .room-ticket {
   position: absolute;
-  top: 13px;
+  top: 10px;
   right: 13px;
   display: grid;
-  min-height: 0;
-  padding: 6px 8px;
-  border-width: 3px;
-  text-align: left;
-}
-
-.room-ticket span {
-  color: var(--orange);
+  color: var(--black);
   font-size: 7px;
 }
 
+.room-ticket span,
 .room-ticket strong {
-  font-size: 17px;
-  letter-spacing: 0.18em;
+  color: var(--black);
+}
+
+.room-ticket strong {
+  font-size: 15px;
+  letter-spacing: 0.13em;
+}
+
+.room-ticket:hover,
+.room-ticket:focus-visible {
+  color: var(--orange);
 }
 
 .flight-readout {
   position: absolute;
-  bottom: 11px;
+  bottom: 13px;
   left: 50%;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 18px;
   align-items: center;
-  width: min(630px, calc(100% - 30px));
-  padding: 8px 11px;
-  color: var(--white);
-  background: var(--black);
-  font-size: 8px;
-  letter-spacing: 0.04em;
+  width: min(650px, calc(100% - 30px));
+  color: var(--black);
+  font-size: 7px;
   transform: translateX(-50%);
 }
 
 .flight-readout span:nth-child(2) {
-  color: var(--orange);
+  color: var(--black);
   text-align: center;
 }
 
@@ -391,80 +380,54 @@ button {
   text-align: right;
 }
 
-.flight-readout strong {
-  font-size: 11px;
-}
-
-.flight-readout.is-stalled {
-  background: var(--red);
+.flight-readout.is-stalled,
+.flight-readout.is-stalled span:nth-child(2) {
+  color: var(--red);
   animation: warning 0.6s steps(2, end) infinite;
 }
 
-.flight-readout.is-stalled span:nth-child(2) {
-  color: var(--white);
-}
-
 @keyframes warning {
-  50% { opacity: 0.6; }
+  50% { visibility: hidden; }
 }
 
-.respawn-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  gap: 7px;
-  padding: 17px 22px;
-  border: 5px solid var(--orange);
-  color: var(--orange);
-  background: var(--black);
-  font-size: 9px;
-  text-align: center;
-  transform: translate(-50%, -50%);
-}
-
-.respawn-card strong {
-  color: var(--white);
-}
-
+.respawn-card,
 .winner-card {
   position: absolute;
   top: 50%;
   left: 50%;
   display: grid;
-  gap: 10px;
-  min-width: 240px;
-  padding: 20px 24px;
-  border: 5px solid var(--orange);
+  gap: 12px;
+  min-width: 250px;
   color: var(--orange);
-  background: var(--black);
   font-size: 9px;
   text-align: center;
   transform: translate(-50%, -50%);
 }
 
-.winner-card strong {
+.respawn-card strong,
+.winner-card strong,
+.winner-card small {
   color: var(--white);
-  font-size: 18px;
+}
+
+.winner-card strong {
+  font-size: 17px;
 }
 
 .winner-card small {
-  color: var(--white);
   font-size: 7px;
 }
 
 .winner-card button {
-  border-color: var(--orange);
+  text-align: center;
 }
 
 .leave-button {
   position: absolute;
   right: 13px;
-  bottom: 13px;
-  min-height: 36px;
-  padding: 7px 9px;
-  border-width: 3px;
-  font-size: 8px;
+  bottom: 8px;
+  color: var(--black);
+  font-size: 7px;
 }
 
 .touch-controls {
@@ -492,60 +455,57 @@ button {
     padding: 5%;
   }
 
-  .title-screen button {
-    min-width: 150px;
-  }
-
   .hangar-overlay {
     align-items: start;
     padding: 28px 18px;
   }
 
+  .menu-card {
+    font-size: 8px;
+  }
+
   .menu-card h1 {
-    margin-bottom: 20px;
+    margin-bottom: 22px;
   }
 
   .callsign-field,
   .choice-group {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .choice-group {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .score-picker {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
+  .callsign-field span,
   .choice-group > span {
     grid-column: 1 / -1;
   }
 
-  .menu-actions {
-    grid-template-columns: 1fr;
+  .callsign-field input {
+    grid-column: 1 / -1;
+  }
+
+  .choice-group button {
+    font-size: 7px;
   }
 
   .scoreboard {
     top: 8px;
     left: 8px;
-    width: 130px;
+    width: 142px;
   }
 
   .game-mode-label {
-    top: 9px;
-    font-size: 6px;
+    top: 10px;
+    font-size: 5px;
   }
 
   .room-ticket {
-    top: 8px;
+    top: 5px;
     right: 8px;
   }
 
   .flight-readout {
-    bottom: 76px;
+    bottom: 70px;
     gap: 7px;
-    font-size: 6px;
+    font-size: 5px;
   }
 
   .leave-button {
@@ -563,19 +523,16 @@ button {
   }
 
   .touch-controls button {
-    min-height: 52px;
-    padding: 8px;
-    border-width: 3px;
-    font-size: 20px;
+    min-height: 46px;
+    color: var(--black);
+    font-size: 8px;
+    text-align: center;
     touch-action: none;
     user-select: none;
   }
 
   .touch-controls .touch-fire {
-    border-color: var(--black);
-    color: var(--black);
-    background: var(--orange);
-    font-size: 10px;
+    color: var(--red);
   }
 }
 
@@ -585,15 +542,11 @@ button {
   }
 
   .title-screen button {
-    min-width: 118px;
-    min-height: 34px;
-    padding: 6px;
-    border-width: 3px;
-    font-size: 8px;
+    font-size: 7px;
   }
 
   .scoreboard {
-    width: 112px;
+    width: 120px;
   }
 
   .game-mode-label {

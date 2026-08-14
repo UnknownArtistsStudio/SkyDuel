@@ -64,6 +64,7 @@ export type GameEvent = {
   type: "shot" | "crash" | "score" | "stall" | "recover";
   playerId: string;
   targetId?: string;
+  time: number;
 };
 
 export type GameState = {
@@ -78,7 +79,7 @@ export type GameState = {
   winner: GameWinner | null;
 };
 
-const COLORS = ["#f02b10", "#00ad38", "#ffb20a", "#087bed", "#d43bce", "#f7f5ef"];
+const COLORS = ["#f02b10", "#00ad38", "#f2a913", "#fffdf8", "#17131f", "#f02b10"];
 const TEAM_COLORS = ["#f02b10", "#00ad38"] as const;
 
 const SPAWNS = [
@@ -180,7 +181,7 @@ export function stepGame(
 ) {
   const safeDt = Math.min(Math.max(dt, 0), 1 / 20);
   if (state.winner) return;
-  state.events = [];
+  state.events = state.events.filter((event) => state.time - event.time < 0.4);
   state.time += safeDt;
 
   for (const plane of state.players) {
@@ -392,7 +393,7 @@ function pushEvent(
   playerId: string,
   targetId?: string,
 ) {
-  state.events.push({ id: state.nextEventId++, type, playerId, targetId });
+  state.events.push({ id: state.nextEventId++, type, playerId, targetId, time: state.time });
 }
 
 export function botInput(state: GameState, botId: string): PilotInput {

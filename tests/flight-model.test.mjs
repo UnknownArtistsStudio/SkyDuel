@@ -108,6 +108,21 @@ test("flashing respawns can neither shoot nor be shot", () => {
   assert.equal(protectedPlane.alive, false, "the plane remained protected after flashing ended");
 });
 
+test("shot events remain long enough to reach multiplayer snapshots", () => {
+  const state = createGame();
+  const shooter = addPlayer(state, "shooter", "SHOOTER");
+  shooter.invulnerableFor = 0;
+
+  stepGame(state, { [shooter.id]: { turn: 0, fire: true } }, 0);
+  assert.ok(state.events.some((event) => event.type === "shot"));
+
+  for (let frame = 0; frame < 6; frame += 1) stepGame(state, {}, 0.05);
+  assert.ok(state.events.some((event) => event.type === "shot"), "the shot vanished before a network snapshot");
+
+  for (let frame = 0; frame < 4; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(state.events.some((event) => event.type === "shot"), false);
+});
+
 test("team rooms balance automatic choices and prevent friendly fire", () => {
   const state = createGame("teams");
   const redOne = addPlayer(state, "red-one", "RED ONE", 0);

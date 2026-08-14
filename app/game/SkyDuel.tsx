@@ -82,7 +82,7 @@ export function SkyDuel() {
           teamPreference: requestedTeam,
         } satisfies NetworkMessage);
       }
-      if (role === "host") setMessage(`${cleanName(name ?? "PILOT")} is joining…`);
+      if (role === "host") setMessage(`${cleanName(name ?? "PILOT")} IS JOINING...`);
     };
     room.onPeerClose = (peerId) => {
       if (role === "host") {
@@ -156,7 +156,7 @@ export function SkyDuel() {
 
   const createRoom = useCallback(async () => {
     setError("");
-    setMessage("Calling the tower…");
+    setMessage("CALLING THE TOWER...");
     setScreen("connecting");
     wakeAudio(audioRef, engineSoundRef);
     try {
@@ -186,7 +186,7 @@ export function SkyDuel() {
       return;
     }
     setError("");
-    setMessage("Looking for that formation…");
+    setMessage("LOOKING FOR THAT FORMATION...");
     setScreen("connecting");
     wakeAudio(audioRef, engineSoundRef);
     try {
@@ -196,7 +196,7 @@ export function SkyDuel() {
       setupRoom(room, "guest", cleanName(callsign), teamPreference);
       setRoomCode(room.info.code);
       setMode("guest");
-      setMessage("Negotiating a direct connection to the lead pilot…");
+      setMessage("CONNECTING TO THE LEAD PILOT...");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "That room could not be joined.");
       setScreen("join");
@@ -356,7 +356,7 @@ export function SkyDuel() {
         {screen === "playing" && (
           <>
             <div className="game-mode-label">
-              {modeLabel(mode)} · {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} · {limitLabel(activeScoreLimit)}
+              {modeLabel(mode)} / {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} / {limitLabel(activeScoreLimit)}
             </div>
             <div className="scoreboard" aria-label="Pilot scores">
               {matchMode === "teams" && mode !== "practice" && (
@@ -385,7 +385,7 @@ export function SkyDuel() {
             <div className={`flight-readout ${readout.stalled ? "is-stalled" : ""}`}>
               <span>SPEED <strong>{readout.speed}</strong></span>
               <span>
-                {readout.protected ? "SAFE · GUNS OFF" : readout.stalled ? "STALL · NOSE DOWN" : "A D TURN · SPACE FIRE"}
+                {readout.protected ? "SAFE / GUNS OFF" : readout.stalled ? "STALL / NOSE DOWN" : "A D TURN / SPACE FIRE"}
               </span>
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
@@ -419,7 +419,7 @@ export function SkyDuel() {
                 onPointerUp={() => touchControl("left", false)}
                 onPointerCancel={() => touchControl("left", false)}
               >
-                ↶
+                LEFT
               </button>
               <button
                 className="touch-fire"
@@ -438,7 +438,7 @@ export function SkyDuel() {
                 onPointerUp={() => touchControl("right", false)}
                 onPointerCancel={() => touchControl("right", false)}
               >
-                ↷
+                RIGHT
               </button>
             </div>
           </>
@@ -448,8 +448,8 @@ export function SkyDuel() {
           <div className="hangar-overlay">
             {screen === "menu" && (
               <div className="menu-card">
-                <p className="menu-eyebrow">SKY DUEL · 2–6 PILOTS</p>
-                <h1>SELECT GAME</h1>
+                <p className="menu-eyebrow">SKY DUEL / 2-6 PILOTS</p>
+                <h1>GAME?</h1>
                 <label className="callsign-field">
                   <span>CALL SIGN</span>
                   <input
@@ -482,9 +482,9 @@ export function SkyDuel() {
                   <TeamPicker value={teamPreference} onChange={setTeamPreference} />
                 )}
                 <div className="menu-actions">
-                  <button type="button" onClick={beginPractice}>PRACTICE</button>
-                  <button className="button-primary" type="button" onClick={createRoom}>CREATE ROOM</button>
-                  <button type="button" onClick={() => { setError(""); setScreen("join"); }}>JOIN ROOM</button>
+                  <button type="button" onClick={beginPractice}>1 PRACTICE</button>
+                  <button type="button" onClick={createRoom}>2 CREATE ROOM</button>
+                  <button type="button" onClick={() => { setError(""); setScreen("join"); }}>3 JOIN ROOM</button>
                 </div>
                 {error && <p className="form-error" role="alert">{error}</p>}
               </div>
@@ -507,8 +507,8 @@ export function SkyDuel() {
                 <TeamPicker value={teamPreference} onChange={setTeamPreference} />
                 <p className="menu-intro">Team choice is used when the room is playing teams.</p>
                 <div className="menu-actions two-up">
-                  <button className="button-primary" type="button" onClick={joinRoom}>JOIN</button>
-                  <button type="button" onClick={() => setScreen("menu")}>BACK</button>
+                  <button type="button" onClick={joinRoom}>1 JOIN</button>
+                  <button type="button" onClick={() => setScreen("menu")}>2 BACK</button>
                 </div>
                 {error && <p className="form-error" role="alert">{error}</p>}
               </div>
@@ -637,7 +637,7 @@ function updateEngineSound(
   const active = Boolean(playing && plane?.alive);
   const speed = plane ? Math.min(240, Math.hypot(plane.vx, plane.vy)) : 0;
   engine.oscillator.frequency.setTargetAtTime(44 + speed * 0.09, context.currentTime, 0.08);
-  engine.gain.gain.setTargetAtTime(active ? 0.014 : 0.0001, context.currentTime, 0.06);
+  engine.gain.gain.setTargetAtTime(active ? 0.0045 : 0.0001, context.currentTime, 0.06);
 }
 
 function playNewSounds(
@@ -650,7 +650,7 @@ function playNewSounds(
   for (const event of state.events) {
     if (event.id <= lastEventRef.current) continue;
     lastEventRef.current = event.id;
-    if (event.type === "shot") tone(context, 210, 0.028, "square", 0.016);
+    if (event.type === "shot") pixelGunshot(context);
     if (event.type === "crash") pixelExplosion(context);
     if (event.type === "stall") tone(context, 120, 0.12, "triangle", 0.025);
   }
@@ -678,6 +678,28 @@ function pixelExplosion(context: AudioContext) {
   source.connect(filter).connect(gain).connect(context.destination);
   source.start();
   tone(context, 92, 0.2, "square", 0.038);
+}
+
+function pixelGunshot(context: AudioContext) {
+  const duration = 0.055;
+  const frameCount = Math.floor(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  let held = 0;
+  for (let index = 0; index < frameCount; index += 1) {
+    if (index % 7 === 0) held = Math.random() > 0.5 ? 0.8 : -0.8;
+    samples[index] = held * (1 - index / frameCount);
+  }
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  filter.type = "highpass";
+  filter.frequency.value = 900;
+  gain.gain.value = 0.065;
+  source.connect(filter).connect(gain).connect(context.destination);
+  source.start();
+  tone(context, 340, duration, "square", 0.035);
 }
 
 function tone(context: AudioContext, frequency: number, duration: number, type: OscillatorType, volume: number) {

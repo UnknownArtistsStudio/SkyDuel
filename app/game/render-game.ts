@@ -115,7 +115,7 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
 
   context.save();
   context.textAlign = "center";
-  context.font = "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.font = gameFont(9);
   context.fillStyle = plane.color;
   context.fillText(plane.name.toUpperCase(), plane.x, plane.y - 23);
   if (isViewer) {
@@ -123,7 +123,7 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
     context.fillRect(plane.x - 3, plane.y + 18, 6, 6);
   }
   if (plane.stalled) {
-    context.font = "800 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.font = gameFont(9);
     context.fillStyle = "#fffdf8";
     context.fillText("STALL", plane.x, plane.y - 38);
   }
@@ -154,11 +154,16 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
     for (let index = 0; index < 8; index += 1) {
       const angle = (index / 8) * Math.PI * 2;
       const radius = 5 + progress * (18 + (index % 2) * 10);
-      context.fillStyle = index % 2 === 0 ? "#ffb20a" : burst.color;
+      context.fillStyle = index % 2 === 0 ? "#f2a913" : burst.color;
       context.fillRect(Math.round(Math.cos(angle) * radius) - 4, Math.round(Math.sin(angle) * radius) - 4, 8, 8);
     }
     context.restore();
   }
+}
+
+function gameFont(size: number) {
+  const family = getComputedStyle(document.body).fontFamily;
+  return `${size}px ${family}`;
 }
 
 export function pilotReadout(state: GameState, pilotId: string) {

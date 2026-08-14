@@ -51,3 +51,5 @@ npx tsc --noEmit
 - `db/schema.ts` and `drizzle/` — signaling database schema and migration
 
 All visuals, interface elements, and aircraft drawings in the game are original. The project does not contain Intellivision code, sprites, sounds, or branding.
+
+The bundled Press Start 2P typeface is distributed under the SIL Open Font License.
