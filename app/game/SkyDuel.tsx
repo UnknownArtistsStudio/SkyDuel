@@ -4,10 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addPlayer,
   botInput,
-  cleanFace,
   cleanName,
   createGame,
-  DEFAULT_FACE,
   MISSILE_DROP_TIME,
   removePlayer,
   resetRound,
@@ -36,7 +34,7 @@ import { pilotReadout, renderGame, resetRendererEffects, type ChatBubble } from 
 type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
 type NetworkMessage =
-  | { type: "hello"; name: string; teamPreference: TeamPreference; face: string }
+  | { type: "hello"; name: string; teamPreference: TeamPreference }
   | { type: "input"; input: PilotInput }
   | { type: "welcome"; playerId: string; state: GameState }
   | { type: "snapshot"; state: GameState }
@@ -136,14 +134,13 @@ export function SkyDuel() {
   const [landscape, setLandscape] = useState<Landscape>("tower");
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
   const [callsign, setCallsign] = useState("ACE");
-  const [face, setFace] = useState(DEFAULT_FACE);
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [message, setMessage] = useState("Engine on. First to 10 wins.");
   const [error, setError] = useState("");
   const [hud, setHud] = useState<{
     readout: ReturnType<typeof pilotReadout>;
-    pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null; face: string; joinedAt: number }>;
+    pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null; joinedAt: number }>;
     scoreLimit: ScoreLimit;
     bombsEnabled: boolean;
     winner: GameState["winner"];
@@ -265,7 +262,6 @@ export function SkyDuel() {
     role: "host" | "guest",
     localName: string,
     requestedTeam: TeamPreference,
-    localFace: string,
   ) => {
     room.onStatus = (status) => setMessage(status);
     room.onPeerOpen = (peerId, name) => {
@@ -274,7 +270,6 @@ export function SkyDuel() {
           type: "hello",
           name: localName,
           teamPreference: requestedTeam,
-          face: localFace,
         } satisfies NetworkMessage);
       }
       if (role === "host") setMessage(`${cleanName(name ?? "PILOT")} IS JOINING...`);
@@ -300,7 +295,7 @@ export function SkyDuel() {
       if (!incoming || typeof incoming !== "object" || !("type" in incoming)) return;
       if (role === "host" && incoming.type === "hello") {
         if (!gameRef.current.players.some((player) => player.id === peerId)) {
-          addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference, incoming.face);
+          addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference);
         }
         room.sendTo(peerId, {
           type: "welcome",
@@ -375,7 +370,7 @@ export function SkyDuel() {
     roomRef.current = null;
     const state = createGame("free-for-all", scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
     const playerId = `pilot-${crypto.randomUUID()}`;
-    addPlayer(state, playerId, cleanName(callsign), "auto", face);
+    addPlayer(state, playerId, cleanName(callsign), "auto");
     addPlayer(state, "practice-rival", "RIVAL");
     gameRef.current = state;
     resetRendererEffects();
@@ -390,7 +385,7 @@ export function SkyDuel() {
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [bombsEnabled, callsign, clearChat, face, landscape, planeHits, revengeEnabled, scoreLimit]);
+  }, [bombsEnabled, callsign, clearChat, landscape, planeHits, revengeEnabled, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -400,7 +395,7 @@ export function SkyDuel() {
     try {
       const room = await PeerRoom.create(cleanName(callsign));
       const state = createGame(matchMode, scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
-      addPlayer(state, room.info.peerId, room.info.name, teamPreference, face);
+      addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
       resetRendererEffects();
       clearChat();
@@ -408,7 +403,7 @@ export function SkyDuel() {
       localIdRef.current = room.info.peerId;
       roomRef.current = room;
       remoteInputsRef.current = {};
-      setupRoom(room, "host", cleanName(callsign), teamPreference, face);
+      setupRoom(room, "host", cleanName(callsign), teamPreference);
       setMode("host");
       setRoomCode(room.info.code);
       setMessage("Room open. Share the four-letter code.");
@@ -417,7 +412,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [bombsEnabled, callsign, clearChat, face, landscape, matchMode, planeHits, revengeEnabled, scoreLimit, setupRoom, teamPreference]);
+  }, [bombsEnabled, callsign, clearChat, landscape, matchMode, planeHits, revengeEnabled, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -434,7 +429,7 @@ export function SkyDuel() {
       const room = await PeerRoom.join(code, cleanName(callsign));
       roomRef.current = room;
       localIdRef.current = room.info.peerId;
-      setupRoom(room, "guest", cleanName(callsign), teamPreference, face);
+      setupRoom(room, "guest", cleanName(callsign), teamPreference);
       setRoomCode(room.info.code);
       setMode("guest");
       setMessage("CONNECTING TO THE LEAD PILOT...");
@@ -442,7 +437,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "That room could not be joined.");
       setScreen("join");
     }
-  }, [callsign, clearChat, face, joinCode, setupRoom, teamPreference]);
+  }, [callsign, clearChat, joinCode, setupRoom, teamPreference]);
 
   const leaveGame = useCallback(() => {
     recognitionRef.current?.abort();
@@ -860,7 +855,7 @@ export function SkyDuel() {
         setHud({
           readout: pilotReadout(state, localIdRef.current),
           pilots: state.players
-            .map(({ id, name, color, score, team, face: pilotFace, joinedAt }) => ({ id, name, color, score, team, face: pilotFace ?? DEFAULT_FACE, joinedAt: joinedAt ?? 0 }))
+            .map(({ id, name, color, score, team, joinedAt }) => ({ id, name, color, score, team, joinedAt: joinedAt ?? 0 }))
             .sort((a, b) => b.score - a.score),
           scoreLimit: state.scoreLimit,
           bombsEnabled: state.bombsEnabled,
@@ -944,9 +939,13 @@ export function SkyDuel() {
             {!winner && pilots.some((pilot) => matchTime - pilot.joinedAt < 2.4) && pilots.length > 0 && (
               <div className="pilot-lineup" aria-label="Pilots entering the match">
                 {pilots.map((pilot) => (
-                  <div className="lineup-pilot" key={pilot.id}>
-                    <PixelPortrait face={pilot.face} color={pilot.color} />
-                    <span>{pilot.name}</span>
+                  <div
+                    className="lineup-pilot"
+                    key={pilot.id}
+                    style={{ "--pilot": pilot.color } as React.CSSProperties}
+                  >
+                    <span>PILOT</span>
+                    <strong>{pilot.name}</strong>
                   </div>
                 ))}
               </div>
@@ -998,9 +997,11 @@ export function SkyDuel() {
             {winner && (
               <div className="winner-card" role="status">
                 <span>WINNER</span>
-                <div className="winner-portraits">
+                <div className="winner-pilots">
                   {winningPilots.map((pilot) => (
-                    <PixelPortrait key={pilot.id} face={pilot.face} color={pilot.color} />
+                    <span key={pilot.id} style={{ "--pilot": pilot.color } as React.CSSProperties}>
+                      {pilot.name}
+                    </span>
                   ))}
                 </div>
                 <strong>{winnerLabel(winner, pilots)}</strong>
@@ -1046,7 +1047,10 @@ export function SkyDuel() {
                     autoComplete="off"
                   />
                 </label>
-                <PixelFaceEditor value={face} onChange={setFace} />
+                <div className="callsign-preview" aria-label={`Pilot name ${cleanName(callsign)}`}>
+                  <span>YOUR PILOT</span>
+                  <strong>{cleanName(callsign)}</strong>
+                </div>
                 <div className="choice-group" role="group" aria-label="Room rules">
                   <span>ROOM RULES</span>
                   <button
@@ -1118,7 +1122,7 @@ export function SkyDuel() {
                 </p>
                 <p className="menu-intro" aria-label="Revenge parachute rule">
                   REVENGE / AT 5 TOTAL KILLS A PARACHUTE APPEARS / COLLECT IT FOR ONE ARMED EJECTION<br />
-                  ON FOOT / LEFT + RIGHT MOVE / FIRE SHOOTS UP / 6 PILOT HITS = 1 PLANE HIT
+                  ON FOOT / LEFT + RIGHT MOVE + AIM / FIRE SHOOTS UP OR SIDEWAYS / 6 PILOT HITS = 1 PLANE HIT
                 </p>
                 <p className="menu-intro" aria-label="Three hit damage rule">
                   3 HIT MODE / DAMAGED / SMOKE / EXPLODE
@@ -1167,79 +1171,6 @@ export function SkyDuel() {
         )}
       </section>
     </main>
-  );
-}
-
-function PixelFaceEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (face: string) => void;
-}) {
-  const drawingRef = useRef<"0" | "1" | null>(null);
-  const workingFaceRef = useRef(cleanFace(value));
-  const pixels = cleanFace(value).split("");
-
-  useEffect(() => {
-    workingFaceRef.current = cleanFace(value);
-  }, [value]);
-
-  const paint = (event: React.PointerEvent<HTMLDivElement>, nextPixel?: "0" | "1") => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const column = Math.max(0, Math.min(7, Math.floor(((event.clientX - bounds.left) / bounds.width) * 8)));
-    const row = Math.max(0, Math.min(7, Math.floor(((event.clientY - bounds.top) / bounds.height) * 8)));
-    const index = row * 8 + column;
-    const pixel = nextPixel ?? drawingRef.current;
-    const workingPixels = workingFaceRef.current.split("");
-    if (!pixel || workingPixels[index] === pixel) return;
-    const next = [...workingPixels];
-    next[index] = pixel;
-    workingFaceRef.current = next.join("");
-    onChange(workingFaceRef.current);
-  };
-
-  return (
-    <div className="face-editor-row">
-      <span>PIXEL PILOT</span>
-      <div
-        className="face-editor"
-        role="img"
-        aria-label="Draw your pilot face with pixels"
-        onContextMenu={(event) => event.preventDefault()}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const column = Math.max(0, Math.min(7, Math.floor(((event.clientX - bounds.left) / bounds.width) * 8)));
-          const row = Math.max(0, Math.min(7, Math.floor(((event.clientY - bounds.top) / bounds.height) * 8)));
-          drawingRef.current = workingFaceRef.current[row * 8 + column] === "1" ? "0" : "1";
-          event.currentTarget.setPointerCapture(event.pointerId);
-          paint(event, drawingRef.current);
-        }}
-        onPointerMove={(event) => {
-          if (drawingRef.current) paint(event);
-        }}
-        onPointerUp={() => { drawingRef.current = null; }}
-        onPointerCancel={() => { drawingRef.current = null; }}
-        onLostPointerCapture={() => { drawingRef.current = null; }}
-      >
-        {pixels.map((pixel, index) => (
-          <span className={pixel === "1" ? "face-pixel is-on" : "face-pixel"} key={index} />
-        ))}
-      </div>
-      <button type="button" onClick={() => onChange("0".repeat(64))}>CLEAR</button>
-      <button type="button" onClick={() => onChange(DEFAULT_FACE)}>RESET</button>
-    </div>
-  );
-}
-
-function PixelPortrait({ face, color }: { face: string; color: string }) {
-  return (
-    <div className="pixel-portrait" style={{ "--pilot": color } as React.CSSProperties} aria-hidden="true">
-      {cleanFace(face).split("").map((pixel, index) => (
-        <span className={pixel === "1" ? "portrait-pixel is-on" : "portrait-pixel"} key={index} />
-      ))}
-    </div>
   );
 }
 
@@ -1664,6 +1595,7 @@ function playNewSounds(
     if (event.type === "roll") pixelRoll(context);
     if (event.type === "crash") pixelExplosion(context);
     if (event.type === "sea-crash") pixelSplash(context);
+    if (event.type === "sea-sink") pixelSplash(context);
     if (event.type === "score" && !state.winner) {
       const pilot = state.players.find((candidate) => candidate.id === event.playerId);
       heroicFanfare(context, pilot?.spawnIndex ?? 0);
