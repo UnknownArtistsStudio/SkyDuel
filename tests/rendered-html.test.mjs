@@ -53,6 +53,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /FIRST TO/);
   assert.match(component, /pixelExplosion/);
   assert.match(component, /pixelGunshot/);
+  assert.match(component, /towerBuzzSound/);
   assert.match(component, /talking \? 0\.0007 : 0\.0045/);
   assert.match(component, /webkitSpeechRecognition/);
   assert.match(component, /TRANSMITTING/);
@@ -88,6 +89,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /ROLL_DURATION/);
   assert.match(core, /ROLL_RECHARGE/);
   assert.match(core, /missileMilestones/);
+  assert.match(core, /towerBuzz/);
   assert.match(core, /cloudPosition/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);
   assert.match(renderer, /drawPixelCloud/);
@@ -95,6 +97,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawBombPowerUps/);
   assert.match(renderer, /drawBombs/);
   assert.match(renderer, /drawMissiles/);
+  assert.match(renderer, /drawTowerBuzzInset/);
+  assert.match(renderer, /COFFEE DOWN/);
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
   assert.match(renderer, /#9b90f4/);
