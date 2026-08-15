@@ -68,7 +68,7 @@ export type Plane = {
   team: Team | null;
   bombs: number;
   missiles: number;
-  missileLeadAwarded: boolean;
+  missileMilestones: number;
 };
 
 export type Bullet = {
@@ -240,7 +240,7 @@ function makePlane(id: string, name: string, spawnIndex: number, team: Team | nu
     team,
     bombs: 0,
     missiles: 0,
-    missileLeadAwarded: false,
+    missileMilestones: 0,
   };
 }
 
@@ -665,21 +665,15 @@ function checkWinner(state: GameState, scorer: Plane) {
 }
 
 function updateMissileAwards(state: GameState) {
-  if (state.players.length < 2) return;
   for (const plane of state.players) {
-    const opponents = state.players.filter((candidate) => candidate.id !== plane.id && !areTeammates(state, plane, candidate));
-    if (!opponents.length) continue;
-    const bestOpponentScore = Math.max(...opponents.map((candidate) => candidate.score));
-    const hasThreeKillLead = plane.score - bestOpponentScore >= 3;
-    if (hasThreeKillLead && !plane.missileLeadAwarded) {
-      plane.missileLeadAwarded = true;
-      if (plane.missiles === 0) {
-        plane.missiles = 1;
-        pushEvent(state, "missile-award", plane.id);
-      }
-    } else if (!hasThreeKillLead) {
-      plane.missileLeadAwarded = false;
-    }
+    const earnedMilestones = Math.floor(plane.score / 3);
+    const awardedMilestones = plane.missileMilestones ?? 0;
+    const newMissiles = Math.max(0, earnedMilestones - awardedMilestones);
+    if (newMissiles === 0) continue;
+
+    plane.missiles += newMissiles;
+    plane.missileMilestones = earnedMilestones;
+    pushEvent(state, "missile-award", plane.id);
   }
 }
 
@@ -753,7 +747,7 @@ export function resetRound(state: GameState) {
     plane.score = 0;
     plane.deaths = 0;
     plane.missiles = 0;
-    plane.missileLeadAwarded = false;
+    plane.missileMilestones = 0;
     respawnPlane(plane);
   }
 }

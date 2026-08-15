@@ -933,7 +933,9 @@ export function SkyDuel() {
                       : readout.rollCooldown > 0
                         ? `ROLL RESET ${readout.rollCooldown.toFixed(1)}`
                         : readout.missiles > 0
-                          ? "MISSILE READY / B FIRE"
+                          ? readout.missiles > 1
+                            ? `MISSILES ${readout.missiles} / B FIRE`
+                            : "MISSILE READY / B FIRE"
                           : readout.bombs > 0
                             ? "BOMB READY / B DROP"
                             : readout.reloadIn > 0
