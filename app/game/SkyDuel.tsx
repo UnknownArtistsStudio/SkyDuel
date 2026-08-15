@@ -1528,7 +1528,14 @@ function playNewSounds(
     if (event.type === "missile-award") missileAwardFanfare(context);
     if (event.type === "missile-launch") pixelMissileLaunch(context);
     if (event.type === "missile-hit") pixelMissileHit(context);
+    if (event.type === "tower-buzz") towerBuzzSound(context);
   }
+}
+
+function towerBuzzSound(context: AudioContext) {
+  sweptTone(context, 330, 72, 0.55, "sawtooth", 0.025);
+  window.setTimeout(() => tone(context, 760, 0.06, "square", 0.025), 230);
+  window.setTimeout(() => tone(context, 510, 0.08, "square", 0.022), 310);
 }
 
 function heroicFanfare(context: AudioContext, pilotIndex: number) {
