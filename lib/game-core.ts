@@ -8,6 +8,7 @@ export const CLOUD_COUNT = 2;
 export const MAGAZINE_SIZE = 3;
 export const RELOAD_TIME = 1.35;
 export const ROLL_DURATION = 0.58;
+export const MISSILE_DROP_TIME = 0.42;
 
 export type MatchMode = "free-for-all" | "teams";
 export type Team = 0 | 1;
@@ -28,7 +29,6 @@ const BULLET_SPEED = 420;
 const BULLET_LIFE = 1.18;
 const FIRE_DELAY = 0.32;
 const MISSILE_SPEED = 535;
-const MISSILE_DROP_TIME = 0.24;
 const MISSILE_LIFE = 2.4;
 const BOMB_GRAVITY = 210;
 const BOMB_PICKUP_RADIUS = 28;
@@ -452,9 +452,9 @@ function launchMissile(state: GameState, plane: Plane) {
     id: state.nextMissileId++,
     ownerId: plane.id,
     x: plane.x,
-    y: plane.y + 12,
-    vx: plane.vx * 0.55,
-    vy: plane.vy * 0.55 + 42,
+    y: plane.y + 9,
+    vx: plane.vx * 0.7,
+    vy: plane.vy * 0.45 + 28,
     angle: plane.angle,
     dropFor: MISSILE_DROP_TIME,
     boosted: false,
@@ -529,7 +529,7 @@ function updateMissiles(state: GameState, dt: number) {
   for (const missile of state.missiles) {
     if (missile.dropFor > 0) {
       missile.dropFor = Math.max(0, missile.dropFor - dt);
-      missile.vy += BOMB_GRAVITY * 0.72 * dt;
+      missile.vy += BOMB_GRAVITY * 0.92 * dt;
       if (missile.dropFor === 0 && !missile.boosted) {
         missile.boosted = true;
         missile.vx = Math.cos(missile.angle) * MISSILE_SPEED;
@@ -554,7 +554,7 @@ function updateMissiles(state: GameState, dt: number) {
       if (owner && areTeammates(state, owner, plane)) continue;
       const dx = wrappedDistance(missile.x, plane.x);
       const dy = missile.y - plane.y;
-      if (dx * dx + dy * dy >= 16 * 16) continue;
+      if (dx * dx + dy * dy >= 13 * 13) continue;
       if (owner) {
         owner.score += 1;
         checkWinner(state, owner);

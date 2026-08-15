@@ -67,6 +67,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /MISSILE READY/);
   assert.match(component, /scheduleMenuBeat/);
   assert.match(component, /scheduleGameBeat/);
+  assert.match(component, /schedulePad/);
   assert.match(component, /heroicFanfare/);
   assert.match(core, /MAX_PLAYERS = 6/);
   assert.match(core, /matchMode/);
@@ -86,6 +87,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawBombPowerUps/);
   assert.match(renderer, /drawBombs/);
   assert.match(renderer, /drawMissiles/);
+  assert.match(renderer, /missileTrails/);
   assert.match(renderer, /#9b90f4/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
   assert.doesNotMatch(renderer, /ui-monospace|SFMono|Menlo/);

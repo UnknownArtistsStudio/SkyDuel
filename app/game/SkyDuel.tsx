@@ -6,6 +6,7 @@ import {
   botInput,
   cleanName,
   createGame,
+  MISSILE_DROP_TIME,
   removePlayer,
   resetRound,
   stepGame,
@@ -1369,12 +1370,12 @@ function updateMusic(
     music.step = 0;
     music.nextBeatAt = context.currentTime + 0.04;
   }
-  const fullVolume = nextMode === "menu" ? 0.52 : nextMode === "game" ? 0.35 : 0.0001;
-  music.master.gain.setTargetAtTime(ducked ? 0.045 : fullVolume, context.currentTime, 0.08);
+  const fullVolume = nextMode === "menu" ? 0.32 : nextMode === "game" ? 0.13 : 0.0001;
+  music.master.gain.setTargetAtTime(ducked ? 0.018 : fullVolume, context.currentTime, 0.16);
   if (nextMode === "silent") return;
 
-  const beatLength = nextMode === "menu" ? 0.19 : 0.32;
-  while (music.nextBeatAt < context.currentTime + 0.2) {
+  const beatLength = nextMode === "menu" ? 0.72 : 0.9;
+  while (music.nextBeatAt < context.currentTime + 0.3) {
     if (nextMode === "menu") scheduleMenuBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
     else scheduleGameBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
     music.step = (music.step + 1) % 16;
@@ -1389,17 +1390,15 @@ function scheduleMenuBeat(
   start: number,
   beat: number,
 ) {
-  const roots = [146.83, 123.47, 98, 110];
-  const root = roots[Math.floor(step / 4)];
-  const melody = [
-    293.66, 369.99, 440, 329.63,
-    246.94, 329.63, 415.3, 293.66,
-    196, 293.66, 392, 261.63,
-    220, 329.63, 440, 369.99,
+  const chords = [
+    [73.42, 87.31, 110, 146.83],
+    [58.27, 73.42, 87.31, 116.54],
+    [65.41, 82.41, 98, 130.81],
+    [55, 65.41, 82.41, 110],
   ];
-  if (step % 2 === 0) scheduleMusicTone(context, destination, root, start, beat * 0.9, 0.035);
-  scheduleMusicTone(context, destination, melody[step], start, beat * 0.62, 0.026);
-  if (step === 0 || step === 8) scheduleMusicTone(context, destination, 48, start, 0.045, 0.045);
+  if (step % 4 === 0) {
+    schedulePad(context, destination, chords[Math.floor(step / 4)], start, beat * 4.15, 0.036, 720, 0.55);
+  }
 }
 
 function scheduleGameBeat(
@@ -1409,17 +1408,51 @@ function scheduleGameBeat(
   start: number,
   beat: number,
 ) {
-  const chordRoots = [110, 98, 123.47, 92.5];
-  const chord = Math.floor(step / 4);
-  const root = chordRoots[chord];
+  const chords = [
+    [55, 65.41, 82.41, 110],
+    [49, 58.27, 73.42, 98],
+    [58.27, 69.3, 87.31, 116.54],
+    [46.25, 55, 69.3, 92.5],
+  ];
   if (step % 4 === 0) {
-    scheduleMusicTone(context, destination, root, start, beat * 3.65, 0.021);
-    scheduleMusicTone(context, destination, root * 1.5, start, beat * 3.65, 0.012);
-    scheduleMusicTone(context, destination, root * 2, start, beat * 3.65, 0.009);
+    schedulePad(context, destination, chords[Math.floor(step / 4)], start, beat * 4.2, 0.018, 520, 0.95);
   }
-  if (step === 2 || step === 6 || step === 10 || step === 14) {
-    scheduleMusicTone(context, destination, root * 2, start, beat * 0.42, 0.01);
-  }
+}
+
+function schedulePad(
+  context: AudioContext,
+  destination: AudioNode,
+  frequencies: readonly number[],
+  start: number,
+  duration: number,
+  volume: number,
+  brightness: number,
+  attack: number,
+) {
+  const filter = context.createBiquadFilter();
+  const envelope = context.createGain();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(brightness * 0.72, start);
+  filter.frequency.linearRampToValueAtTime(brightness, start + attack);
+  filter.Q.value = 0.7;
+  envelope.gain.setValueAtTime(0.0001, start);
+  envelope.gain.linearRampToValueAtTime(volume, start + attack);
+  envelope.gain.setValueAtTime(volume, start + duration - 0.75);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  filter.connect(envelope).connect(destination);
+
+  const detunes = [-7, 5, -3, 8];
+  frequencies.forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    const voice = context.createGain();
+    oscillator.type = index % 2 === 0 ? "sawtooth" : "triangle";
+    oscillator.frequency.setValueAtTime(frequency, start);
+    oscillator.detune.setValueAtTime(detunes[index % detunes.length], start);
+    voice.gain.value = index === 0 ? 0.34 : 0.22;
+    oscillator.connect(voice).connect(filter);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.04);
+  });
 }
 
 function scheduleMusicTone(
@@ -1516,7 +1549,10 @@ function pixelRoll(context: AudioContext) {
 
 function pixelMissileLaunch(context: AudioContext) {
   sweptTone(context, 115, 72, 0.18, "square", 0.028);
-  window.setTimeout(() => sweptTone(context, 260, 780, 0.28, "sawtooth", 0.035), 190);
+  window.setTimeout(
+    () => sweptTone(context, 260, 780, 0.28, "sawtooth", 0.035),
+    MISSILE_DROP_TIME * 1000,
+  );
 }
 
 function pixelMissileHit(context: AudioContext) {

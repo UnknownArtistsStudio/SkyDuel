@@ -6,6 +6,7 @@ import {
   bombPowerUpPosition,
   createGame,
   groundY,
+  MISSILE_DROP_TIME,
   planeSpeed,
   resetRound,
   stepGame,
@@ -189,8 +190,13 @@ test("a three-kill lead awards one missile and the special control launches it",
   assert.equal(leader.missiles, 0);
   assert.equal(state.missiles.length, 1);
   assert.equal(state.missiles[0].boosted, false);
-  for (let frame = 0; frame < 6; frame += 1) stepGame(state, {}, 0.05);
+  const launchY = state.missiles[0].y;
+  for (let frame = 0; frame < 7; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(state.missiles[0]?.boosted, false, "the missile ignited before its drop was visible");
+  assert.ok(state.missiles[0].y > launchY + 8, "the missile did not fall away from the aircraft");
+  for (let frame = 0; frame < 3; frame += 1) stepGame(state, {}, 0.05);
   assert.equal(state.missiles[0]?.boosted, true, "the missile never ignited after its drop");
+  assert.equal(MISSILE_DROP_TIME, 0.42);
   assert.ok(Math.hypot(state.missiles[0].vx, state.missiles[0].vy) > 500);
 });
 
