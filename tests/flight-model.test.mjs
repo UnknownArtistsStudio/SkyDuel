@@ -190,18 +190,22 @@ test("barrel rolls require a short recharge before another dodge", () => {
   assert.ok(pilot.rollFor > 0, "the roll did not return after recharging");
 });
 
-test("a three-kill lead awards one missile and the special control launches it", () => {
+test("every pilot earns an accumulating missile at each three-kill milestone", () => {
   const state = createGame("free-for-all", null);
   const leader = addPlayer(state, "leader", "LEADER");
-  addPlayer(state, "rival", "RIVAL");
+  const rival = addPlayer(state, "rival", "RIVAL");
   leader.score = 3;
+  rival.score = 3;
   leader.invulnerableFor = 0;
 
   stepGame(state, {}, 0);
   assert.equal(leader.missiles, 1);
-  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 1);
+  assert.equal(rival.missiles, 1, "the other pilot did not receive the same milestone reward");
+  assert.equal(leader.missileMilestones, 1);
+  assert.equal(rival.missileMilestones, 1);
+  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 2);
   stepGame(state, {}, 0);
-  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 1, "the lead repeatedly awarded missiles");
+  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 2, "the milestone repeatedly awarded missiles");
 
   stepGame(state, { leader: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
   assert.equal(leader.missiles, 0);
@@ -215,6 +219,18 @@ test("a three-kill lead awards one missile and the special control launches it",
   assert.equal(state.missiles[0]?.boosted, true, "the missile never ignited after its drop");
   assert.equal(MISSILE_DROP_TIME, 0.42);
   assert.ok(Math.hypot(state.missiles[0].vx, state.missiles[0].vy) > 500);
+
+  leader.score = 5;
+  stepGame(state, {}, 0);
+  assert.equal(leader.missiles, 0, "a missile was awarded before the next three-kill milestone");
+
+  leader.score = 6;
+  rival.score = 6;
+  stepGame(state, {}, 0);
+  assert.equal(leader.missiles, 1, "the pilot did not earn another missile at six kills");
+  assert.equal(rival.missiles, 2, "unused missiles did not accumulate");
+  assert.equal(leader.missileMilestones, 2);
+  assert.equal(rival.missileMilestones, 2);
 });
 
 test("barrel rolls also dodge missiles", () => {
