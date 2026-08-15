@@ -63,6 +63,10 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /voice-request/);
   assert.match(component, /BOMB PICKUPS/);
   assert.match(component, /RADIO SENT/);
+  assert.match(component, /RADIO CHAT \/ ALLOW MIC FIRST TIME/);
+  assert.match(component, /HOLD T \+ SPEAK \/ RELEASE TO SEND \/ 3 SEC MAX/);
+  assert.match(component, /PHONE: HOLD TALK \/ ENTER: TYPE MESSAGE/);
+  assert.match(component, /NOT STORED/);
   assert.match(component, /A\+D ROLL/);
   assert.match(component, /ROLL RESET/);
   assert.match(component, /TITLE_MUSIC_LEAD_IN/);
