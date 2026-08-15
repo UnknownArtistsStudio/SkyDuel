@@ -218,6 +218,9 @@ test("three-hit mode shows two damage stages before a plane explodes", () => {
 
   assert.equal(shooter.score, 1);
   assert.equal(state.events.filter((event) => event.type === "plane-hit").length, 2);
+  const mayday = state.events.filter((event) => event.type === "mayday");
+  assert.equal(mayday.length, 1, "the critical-damage warning did not fire exactly once");
+  assert.equal(mayday[0].targetId, target.id);
 });
 
 test("the five-kill revenge parachute creates an armed vulnerable pilot", () => {
@@ -374,6 +377,7 @@ test("sea crashes leave an armed pilot on the wreck and mountains shape collisio
   assert.equal(pilot.alive, false);
   assert.equal(sea.groundPilots[0]?.wreck, true);
   assert.ok(sea.events.some((event) => event.type === "sea-crash"));
+  assert.equal(sea.events.some((event) => event.type === "pilot-eject"), false);
 
   assert.ok(groundY(260, "mountains") < groundY(600, "mountains") - 200);
   assert.ok(groundY(900, "mountains") < groundY(600, "mountains") - 150);
