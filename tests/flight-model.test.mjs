@@ -222,20 +222,10 @@ test("three-hit mode shows two damage stages before a plane explodes", () => {
   assert.equal(mayday[0].targetId, target.id);
 });
 
-test("the five-kill revenge parachute creates an armed vulnerable pilot", () => {
+test("parachute mode ejects an armed vulnerable pilot after every weapon takedown", () => {
   const state = createGame("free-for-all", null, false, true, 1);
   const carrier = addPlayer(state, "carrier", "CARRIER");
   const attacker = addPlayer(state, "attacker", "ATTACKER");
-  carrier.score = 5;
-  stepGame(state, {}, 0);
-  assert.ok(state.revengePowerUp, "the revenge parachute did not appear at five total kills");
-
-  carrier.x = state.revengePowerUp.x;
-  carrier.y = state.revengePowerUp.y;
-  stepGame(state, {}, 0);
-  assert.equal(carrier.parachutes, 1);
-  assert.equal(state.revengePowerUp, null);
-
   carrier.invulnerableFor = 0;
   attacker.invulnerableFor = 0;
   state.bullets.push({
@@ -283,6 +273,37 @@ test("the five-kill revenge parachute creates an armed vulnerable pilot", () => 
   stepGame(state, {}, 0);
   assert.equal(state.groundPilots.length, 0);
   assert.ok(state.events.some((event) => event.type === "pilot-shot"));
+
+  for (let frame = 0; frame < 60; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(carrier.alive, true);
+  carrier.invulnerableFor = 0;
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: carrier.x,
+    y: carrier.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(state.groundPilots[0]?.ownerId, carrier.id, "the second takedown did not eject the pilot");
+
+  const disabled = createGame("free-for-all", null, false, false, 1);
+  const grounded = addPlayer(disabled, "grounded", "GROUNDED");
+  const rival = addPlayer(disabled, "rival", "RIVAL");
+  grounded.invulnerableFor = 0;
+  disabled.bullets.push({
+    id: disabled.nextBulletId++,
+    ownerId: rival.id,
+    x: grounded.x,
+    y: grounded.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(disabled, {}, 0);
+  assert.equal(disabled.groundPilots.length, 0, "parachute mode off still ejected a pilot");
 });
 
 test("the pilot machine gun needs sustained fire to destroy a plane", () => {
@@ -321,7 +342,7 @@ test("the pilot machine gun needs sustained fire to destroy a plane", () => {
   assert.equal(gunner.score, 1);
 });
 
-test("bombs launch revenge pilots and missiles vaporize them", () => {
+test("bombs throw ground pilots and missiles vaporize them", () => {
   const bombState = createGame("free-for-all", null, true, true);
   const bomber = addPlayer(bombState, "bomber", "BOMBER");
   const bombTarget = addPlayer(bombState, "target", "TARGET");

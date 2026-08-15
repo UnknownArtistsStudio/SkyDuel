@@ -78,9 +78,10 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /MISSILE ARMED/);
   assert.match(component, /EJECT EJECT/);
   assert.match(component, /MAYDAY MAYDAY/);
-  assert.match(component, /PARACHUTE EQUIPPED/);
   assert.match(component, /PLANE DAMAGE/);
-  assert.match(component, /REVENGE PILOT/);
+  assert.match(component, /PARACHUTE MODE/);
+  assert.match(component, /EVERY WEAPON TAKEDOWN EJECTS THE PILOT/);
+  assert.doesNotMatch(component, /PARACHUTE EQUIPPED|REVENGE PILOT/);
   assert.match(component, /6 PILOT HITS = 1 PLANE HIT/);
   assert.match(component, /ADD W OR UP = DIAGONAL/);
   assert.match(component, /MOVE \/ AIM/);
@@ -113,8 +114,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /aimUp/);
   assert.match(core, /SEA_WRECK_SINK_TIME = 5/);
   assert.match(core, /GroundPilot/);
-  assert.match(core, /revengePowerUp/);
-  assert.match(core, /revengeSpawned/);
+  assert.match(core, /parachuteMode/);
+  assert.doesNotMatch(core, /revengePowerUp|revengeSpawned/);
   assert.match(core, /planeHits/);
   assert.match(core, /landscape/);
   assert.match(core, /planeInCloud/);
@@ -126,7 +127,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawBombPowerUps/);
   assert.match(renderer, /drawBombs/);
   assert.match(renderer, /drawMissiles/);
-  assert.match(renderer, /drawRevengePowerUp/);
+  assert.doesNotMatch(renderer, /drawRevengePowerUp/);
   assert.match(renderer, /drawGroundPilots/);
   assert.match(renderer, /drawPilotBullets/);
   assert.match(renderer, /Math\.abs\(aim\) === 2/);

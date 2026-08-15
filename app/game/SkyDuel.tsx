@@ -129,7 +129,7 @@ export function SkyDuel() {
   const [matchMode, setMatchMode] = useState<MatchMode>("free-for-all");
   const [scoreLimit, setScoreLimit] = useState<ScoreLimit>(10);
   const [bombsEnabled, setBombsEnabled] = useState(false);
-  const [revengeEnabled, setRevengeEnabled] = useState(true);
+  const [parachuteMode, setParachuteMode] = useState(true);
   const [planeHits, setPlaneHits] = useState<PlaneHits>(1);
   const [landscape, setLandscape] = useState<Landscape>("tower");
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
@@ -157,7 +157,6 @@ export function SkyDuel() {
       respawnIn: 0,
       bombs: 0,
       missiles: 0,
-      parachutes: 0,
       shotsRemaining: 0,
       reloadIn: 0,
       onFoot: false,
@@ -327,7 +326,7 @@ export function SkyDuel() {
         setMatchMode(incoming.state.matchMode);
         setScoreLimit(incoming.state.scoreLimit);
         setBombsEnabled(incoming.state.bombsEnabled);
-        setRevengeEnabled(incoming.state.revengeEnabled ?? true);
+        setParachuteMode(incoming.state.parachuteMode ?? true);
         setPlaneHits(incoming.state.planeHits ?? 1);
         setLandscape(incoming.state.landscape ?? "tower");
         setMode("guest");
@@ -368,7 +367,7 @@ export function SkyDuel() {
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame("free-for-all", scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
+    const state = createGame("free-for-all", scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape);
     const playerId = `pilot-${crypto.randomUUID()}`;
     addPlayer(state, playerId, cleanName(callsign), "auto");
     addPlayer(state, "practice-rival", "RIVAL");
@@ -385,7 +384,7 @@ export function SkyDuel() {
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [bombsEnabled, callsign, clearChat, landscape, planeHits, revengeEnabled, scoreLimit]);
+  }, [bombsEnabled, callsign, clearChat, landscape, parachuteMode, planeHits, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -394,7 +393,7 @@ export function SkyDuel() {
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame(matchMode, scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
+      const state = createGame(matchMode, scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
       resetRendererEffects();
@@ -412,7 +411,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [bombsEnabled, callsign, clearChat, landscape, matchMode, planeHits, revengeEnabled, scoreLimit, setupRoom, teamPreference]);
+  }, [bombsEnabled, callsign, clearChat, landscape, matchMode, parachuteMode, planeHits, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -977,8 +976,6 @@ export function SkyDuel() {
                       ? "BARREL ROLL"
                       : readout.rollCooldown > 0
                         ? `ROLL RESET ${readout.rollCooldown.toFixed(1)}`
-                        : readout.parachutes > 0
-                          ? "REVENGE READY"
                         : readout.missiles > 0
                           ? readout.missiles > 1
                             ? `MISSILES ${readout.missiles} / B FIRE`
@@ -1112,12 +1109,12 @@ export function SkyDuel() {
                     ON
                   </button>
                 </div>
-                <div className="choice-group" role="group" aria-label="Revenge parachute">
-                  <span>REVENGE PILOT</span>
-                  <button type="button" aria-pressed={!revengeEnabled} onClick={() => setRevengeEnabled(false)}>
+                <div className="choice-group" role="group" aria-label="Parachute mode">
+                  <span>PARACHUTE MODE</span>
+                  <button type="button" aria-pressed={!parachuteMode} onClick={() => setParachuteMode(false)}>
                     OFF
                   </button>
-                  <button type="button" aria-pressed={revengeEnabled} onClick={() => setRevengeEnabled(true)}>
+                  <button type="button" aria-pressed={parachuteMode} onClick={() => setParachuteMode(true)}>
                     ON
                   </button>
                 </div>
@@ -1133,8 +1130,8 @@ export function SkyDuel() {
                 <p className="menu-intro" aria-label="Missile reward rule">
                   MISSILES / EVERY 3 KILLS EARNS 1 / UNUSED MISSILES STACK
                 </p>
-                <p className="menu-intro" aria-label="Revenge parachute rule">
-                  REVENGE / AT 5 TOTAL KILLS A PARACHUTE APPEARS / COLLECT IT FOR ONE ARMED EJECTION<br />
+                <p className="menu-intro" aria-label="Parachute mode rule">
+                  PARACHUTE MODE / EVERY WEAPON TAKEDOWN EJECTS THE PILOT<br />
                   ON FOOT / FIRE = UP / LEFT OR RIGHT + FIRE = SIDE / ADD W OR UP = DIAGONAL<br />
                   PHONE / PUSH STICK UP + LEFT OR RIGHT FOR DIAGONAL AIM / 6 PILOT HITS = 1 PLANE HIT
                 </p>
@@ -1648,11 +1645,6 @@ function playNewSounds(
     if (event.type === "missile-hit") pixelMissileHit(context);
     if (event.type === "plane-hit") tone(context, 95, 0.1, "square", 0.028);
     if (event.type === "mayday" && event.targetId === localPlayerId) announce("MAYDAY MAYDAY");
-    if (event.type === "revenge-spawn") revengeCue(context);
-    if (event.type === "revenge-pickup") {
-      suspenseFanfare(context);
-      if (event.playerId === localPlayerId) announce("PARACHUTE EQUIPPED");
-    }
     if (event.type === "pilot-eject") {
       sweptTone(context, 420, 150, 0.28, "square", 0.024);
       if (event.playerId === localPlayerId) announce("EJECT EJECT");
@@ -1699,13 +1691,6 @@ function computerVoice(
   scheduleEffectTone(context, 720, start, 0.045, 0.018);
   scheduleEffectTone(context, 510, start + 0.065, 0.055, 0.016);
   window.speechSynthesis.speak(utterance);
-}
-
-function revengeCue(context: AudioContext) {
-  const start = context.currentTime;
-  [110, 146.83, 110, 185, 220].forEach((frequency, index) => {
-    scheduleEffectTone(context, frequency, start + index * 0.11, index === 4 ? 0.32 : 0.1, 0.03);
-  });
 }
 
 function victoryFanfare(context: AudioContext) {
