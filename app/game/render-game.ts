@@ -4,8 +4,6 @@ import {
   groundY,
   planeSpeed,
   ROLL_DURATION,
-  TOWER_BUZZ_DURATION,
-  TOWER_X,
   WORLD_HEIGHT,
   WORLD_WIDTH,
   type GameState,
@@ -62,7 +60,6 @@ export function renderGame(
     if (plane.alive) drawPlane(context, plane, plane.id === viewerId, state.time);
   }
   drawSpeechBubbles(context, state, chatBubbles, frameTime);
-  drawTowerBuzzInset(context, state);
 }
 
 function drawSky(context: CanvasRenderingContext2D) {
@@ -92,7 +89,7 @@ function drawTerrain(context: CanvasRenderingContext2D) {
   context.fillRect(0, ground, WORLD_WIDTH, WORLD_HEIGHT - ground);
   context.fillStyle = "#17131f";
   context.fillRect(0, ground, WORLD_WIDTH, 7);
-  drawTower(context, TOWER_X, ground);
+  drawTower(context, WORLD_WIDTH / 2, ground);
 }
 
 function drawTower(context: CanvasRenderingContext2D, x: number, ground: number) {
@@ -105,77 +102,6 @@ function drawTower(context: CanvasRenderingContext2D, x: number, ground: number)
   context.fillRect(x - 8, ground - 117, 16, 11);
   context.fillRect(x - 3, ground - 80, 6, 16);
   context.fillRect(x - 3, ground - 48, 6, 16);
-}
-
-function drawTowerBuzzInset(context: CanvasRenderingContext2D, state: GameState) {
-  const buzz = state.towerBuzz;
-  if (!buzz) return;
-  const age = state.time - buzz.time;
-  if (age < 0 || age > TOWER_BUZZ_DURATION) return;
-
-  const pilot = state.players.find((plane) => plane.id === buzz.playerId);
-  const x = 850;
-  const y = 72;
-  const width = 320;
-  const height = 178;
-  const jolt = age < 0.3 && Math.floor(age * 24) % 2 === 0 ? 5 : 0;
-  const spilling = age > 0.22;
-
-  context.save();
-  context.translate(jolt, 0);
-  context.fillStyle = "#17131f";
-  context.fillRect(x, y, width, height);
-  context.fillStyle = "#9b90f4";
-  context.fillRect(x + 7, y + 29, width - 14, height - 36);
-
-  context.font = gameFont(9);
-  context.textAlign = "left";
-  context.fillStyle = "#fffdf8";
-  context.fillText(`TOWER BUZZ / ${pilot?.name ?? "PILOT"}`, x + 10, y + 19);
-
-  const cabinTop = y + 44;
-  context.fillStyle = "#17131f";
-  context.fillRect(x + 24, cabinTop, 272, 8);
-  context.fillRect(x + 24, cabinTop, 8, 111);
-  context.fillRect(x + 288, cabinTop, 8, 111);
-  context.fillRect(x + 24, cabinTop + 103, 272, 8);
-
-  const headX = x + 72;
-  const headY = cabinTop + (spilling ? 22 : 25);
-  context.fillStyle = "#17131f";
-  context.fillRect(headX - 7, headY - 8, 62, 15);
-  context.fillRect(headX - 12, headY + 2, 12, 32);
-  context.fillStyle = "#fffdf8";
-  context.fillRect(headX, headY + 7, 48, 37);
-  context.fillStyle = "#17131f";
-  context.fillRect(headX + 8, headY + 17, 7, 7);
-  context.fillRect(headX + 33, headY + 17, 7, 7);
-  context.fillRect(headX + 17, headY + (spilling ? 32 : 34), 15, 5);
-  context.fillRect(headX - 8, headY + 44, 65, 55);
-
-  context.fillStyle = "#fffdf8";
-  context.fillRect(x + 130, cabinTop + 76, spilling ? 70 : 56, 9);
-  context.fillRect(x + 184, cabinTop + (spilling ? 70 : 58), 13, spilling ? 22 : 18);
-
-  const cupX = x + (spilling ? 220 : 196);
-  const cupY = cabinTop + (spilling ? 86 : 54);
-  context.fillRect(cupX, cupY, spilling ? 27 : 22, spilling ? 9 : 23);
-  context.fillRect(cupX + (spilling ? 20 : 18), cupY + (spilling ? -6 : 5), 10, 9);
-
-  if (spilling) {
-    const spillProgress = Math.min(1, (age - 0.22) / 0.75);
-    context.fillStyle = "#f2a913";
-    for (let index = 0; index < 5; index += 1) {
-      const dropX = x + 211 + index * 13;
-      const dropY = cabinTop + 70 + Math.round(((spillProgress + index * 0.17) % 1) * 48);
-      context.fillRect(dropX, dropY, 8, 8);
-    }
-    context.fillRect(x + 200, cabinTop + 98, 82 * spillProgress, 7);
-    context.font = gameFont(9);
-    context.fillText("COFFEE DOWN", x + 185, cabinTop + 95);
-  }
-
-  context.restore();
 }
 
 function drawBullets(context: CanvasRenderingContext2D, state: GameState) {

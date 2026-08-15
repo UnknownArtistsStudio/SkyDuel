@@ -190,35 +190,6 @@ test("barrel rolls require a short recharge before another dodge", () => {
   assert.ok(pilot.rollFor > 0, "the roll did not return after recharging");
 });
 
-test("a low pass buzzes the tower only once per match", () => {
-  const state = createGame("free-for-all", 10);
-  const pilot = addPlayer(state, "pilot", "MAVERICK");
-  const rival = addPlayer(state, "rival", "RIVAL");
-  pilot.invulnerableFor = 0;
-  pilot.x = 595;
-  pilot.y = 450;
-  pilot.vx = 190;
-  pilot.vy = 0;
-  pilot.angle = 0;
-
-  stepGame(state, {}, 0.05);
-  assert.equal(state.towerBuzz?.playerId, pilot.id);
-  assert.equal(state.events.filter((event) => event.type === "tower-buzz").length, 1);
-
-  rival.invulnerableFor = 0;
-  rival.x = 605;
-  rival.y = 450;
-  rival.vx = -190;
-  rival.vy = 0;
-  rival.angle = Math.PI;
-  stepGame(state, {}, 0.05);
-  assert.equal(state.towerBuzz?.playerId, pilot.id, "a second pilot replaced the first tower buzz");
-  assert.equal(state.events.filter((event) => event.type === "tower-buzz").length, 1);
-
-  resetRound(state);
-  assert.equal(state.towerBuzz, null, "the tower buzz did not reset for a new match");
-});
-
 test("every pilot earns an accumulating missile at each three-kill milestone", () => {
   const state = createGame("free-for-all", null);
   const leader = addPlayer(state, "leader", "LEADER");
