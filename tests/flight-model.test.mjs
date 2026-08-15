@@ -124,6 +124,130 @@ test("shot events remain long enough to reach multiplayer snapshots", () => {
   assert.equal(state.events.some((event) => event.type === "shot"), false);
 });
 
+test("guns fire three-shot bursts and then reload", () => {
+  const state = createGame("free-for-all", null);
+  const shooter = addPlayer(state, "shooter", "SHOOTER");
+  shooter.invulnerableFor = 0;
+
+  for (let shot = 0; shot < 3; shot += 1) {
+    shooter.fireCooldown = 0;
+    stepGame(state, { shooter: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
+  }
+  assert.equal(shooter.shotsRemaining, 0);
+  assert.ok(shooter.reloadIn > 1);
+  assert.equal(state.bullets.length, 3);
+
+  shooter.fireCooldown = 0;
+  stepGame(state, { shooter: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
+  assert.equal(state.bullets.length, 3, "the empty gun fired a fourth shot");
+
+  for (let frame = 0; frame < 30; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(shooter.shotsRemaining, 3);
+  assert.equal(shooter.reloadIn, 0);
+});
+
+test("a timed barrel roll dodges bullets but ends cleanly", () => {
+  const state = createGame("free-for-all", null);
+  const defender = addPlayer(state, "defender", "DEFENDER");
+  const attacker = addPlayer(state, "attacker", "ATTACKER");
+  defender.invulnerableFor = 0;
+  attacker.invulnerableFor = 0;
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: defender.x,
+    y: defender.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+
+  stepGame(state, { defender: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
+  assert.equal(defender.alive, true);
+  assert.ok(defender.rollFor > 0);
+  assert.equal(state.bullets.length, 1, "the roll should evade rather than erase the bullet");
+
+  defender.rollFor = 0;
+  stepGame(state, {}, 0);
+  assert.equal(defender.alive, false, "the dodge remained active after the roll ended");
+});
+
+test("a three-kill lead awards one missile and the special control launches it", () => {
+  const state = createGame("free-for-all", null);
+  const leader = addPlayer(state, "leader", "LEADER");
+  addPlayer(state, "rival", "RIVAL");
+  leader.score = 3;
+  leader.invulnerableFor = 0;
+
+  stepGame(state, {}, 0);
+  assert.equal(leader.missiles, 1);
+  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 1);
+  stepGame(state, {}, 0);
+  assert.equal(state.events.filter((event) => event.type === "missile-award").length, 1, "the lead repeatedly awarded missiles");
+
+  stepGame(state, { leader: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
+  assert.equal(leader.missiles, 0);
+  assert.equal(state.missiles.length, 1);
+  assert.equal(state.missiles[0].boosted, false);
+  for (let frame = 0; frame < 6; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(state.missiles[0]?.boosted, true, "the missile never ignited after its drop");
+  assert.ok(Math.hypot(state.missiles[0].vx, state.missiles[0].vy) > 500);
+});
+
+test("barrel rolls also dodge missiles", () => {
+  const state = createGame("free-for-all", null);
+  const defender = addPlayer(state, "defender", "DEFENDER");
+  const attacker = addPlayer(state, "attacker", "ATTACKER");
+  defender.invulnerableFor = 0;
+  attacker.invulnerableFor = 0;
+  state.missiles.push({
+    id: state.nextMissileId++,
+    ownerId: attacker.id,
+    x: defender.x,
+    y: defender.y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    dropFor: 0,
+    boosted: true,
+    life: 1,
+  });
+
+  stepGame(state, { defender: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
+  assert.equal(defender.alive, true);
+  defender.rollFor = 0;
+  stepGame(state, {}, 0);
+  assert.equal(defender.alive, false);
+  assert.equal(attacker.score, 1);
+});
+
+test("missiles ignore teammates and take priority over carried bombs", () => {
+  const state = createGame("teams", null, true);
+  const leader = addPlayer(state, "leader", "LEADER", 0);
+  const teammate = addPlayer(state, "teammate", "TEAMMATE", 0);
+  addPlayer(state, "rival", "RIVAL", 1);
+  leader.invulnerableFor = 0;
+  teammate.invulnerableFor = 0;
+  leader.missiles = 1;
+  leader.bombs = 1;
+
+  stepGame(state, { leader: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
+  assert.equal(leader.missiles, 0);
+  assert.equal(leader.bombs, 1, "launching a missile also consumed the bomb");
+  assert.equal(state.missiles.length, 1);
+  assert.equal(state.bombs.length, 0);
+
+  const missile = state.missiles[0];
+  missile.x = teammate.x;
+  missile.y = teammate.y;
+  missile.vx = 0;
+  missile.vy = 0;
+  missile.dropFor = 0;
+  missile.boosted = true;
+  stepGame(state, {}, 0);
+  assert.equal(teammate.alive, true, "a missile hit its owner's teammate");
+});
+
 test("team rooms balance automatic choices and prevent friendly fire", () => {
   const state = createGame("teams");
   const redOne = addPlayer(state, "red-one", "RED ONE", 0);
