@@ -1631,10 +1631,11 @@ function playNewSounds(
     if (event.type === "stall") tone(context, 120, 0.12, "triangle", 0.025);
     if (event.type === "bomb-pickup") {
       suspenseFanfare(context);
+      if (event.playerId === localPlayerId) announce("BOMB READY");
     }
     if (event.type === "bomb-drop") {
       tone(context, 150, 0.13, "square", 0.035);
-      if (event.playerId === localPlayerId) announce("BOMB HATCH OPEN");
+      if (event.playerId === localPlayerId) announce("BOMBS AWAY");
     }
     if (event.type === "bomb-explosion") pixelBombExplosion(context);
     if (event.type === "missile-award") {

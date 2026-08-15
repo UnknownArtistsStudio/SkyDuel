@@ -74,7 +74,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /MISSILE READY/);
   assert.match(component, /MISSILES/);
   assert.match(component, /SpeechSynthesisUtterance/);
-  assert.match(component, /BOMB HATCH OPEN/);
+  assert.match(component, /BOMB READY/);
+  assert.match(component, /BOMBS AWAY/);
+  assert.doesNotMatch(component, /BOMB HATCH OPEN/);
   assert.match(component, /MISSILE ARMED/);
   assert.match(component, /EJECT EJECT/);
   assert.match(component, /MAYDAY MAYDAY/);
