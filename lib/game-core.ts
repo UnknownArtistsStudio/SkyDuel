@@ -38,13 +38,15 @@ const MISSILE_LIFE = 2.4;
 const BOMB_GRAVITY = 210;
 const BOMB_PICKUP_RADIUS = 28;
 const BOMB_LIFE = 8;
+const PILOT_AIM_LIMIT = Math.PI / 2;
+const PILOT_AIM_SPEED = Math.PI * 0.95;
+const PILOT_BULLET_SPEED = 330;
 
 export type PilotInput = {
   turn: -1 | 0 | 1;
   fire: boolean;
   bomb: boolean;
   roll: boolean;
-  aimUp?: boolean;
 };
 
 export type Plane = {
@@ -113,7 +115,7 @@ export type GroundPilot = {
   falling: boolean;
   wreck: boolean;
   strandedFor: number;
-  aim: -2 | -1 | 0 | 1 | 2;
+  aimAngle: number;
   fireCooldown: number;
   invulnerableFor: number;
 };
@@ -614,6 +616,11 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
     const input = inputs[pilot.ownerId] ?? { turn: 0, fire: false, bomb: false, roll: false };
     pilot.invulnerableFor = Math.max(0, pilot.invulnerableFor - dt);
     pilot.fireCooldown = Math.max(0, pilot.fireCooldown - dt);
+    pilot.aimAngle = clamp(
+      (Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0) + input.turn * PILOT_AIM_SPEED * dt,
+      -PILOT_AIM_LIMIT,
+      PILOT_AIM_LIMIT,
+    );
     if (pilot.falling) {
       pilot.vx += input.turn * 32 * dt;
       pilot.vx *= Math.pow(0.985, dt * 60);
@@ -637,7 +644,7 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
       : 0;
     if (pilot.x < 0) pilot.x += WORLD_WIDTH;
     if (pilot.x > WORLD_WIDTH) pilot.x -= WORLD_WIDTH;
-    if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot, input.turn, Boolean(input.aimUp));
+    if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot);
   }
 
   const sinkingPilots = state.groundPilots.filter(
@@ -658,21 +665,22 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
 function firePilotGun(
   state: GameState,
   pilot: GroundPilot,
-  turn: -1 | 0 | 1,
-  aimUp: boolean,
 ) {
   pilot.fireCooldown = 0.16;
-  pilot.aim = turn === 0 ? 0 : aimUp ? turn : turn === -1 ? -2 : 2;
-  const diagonal = aimUp && turn !== 0;
-  const horizontalSpeed = turn * (diagonal ? 235 : 330);
-  const verticalSpeed = turn === 0 ? -325 : diagonal ? -235 : 0;
+  const aimAngle = clamp(
+    Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0,
+    -PILOT_AIM_LIMIT,
+    PILOT_AIM_LIMIT,
+  );
+  const horizontalDirection = Math.sin(aimAngle);
+  const verticalDirection = -Math.cos(aimAngle);
   state.pilotBullets.push({
     id: state.nextPilotBulletId++,
     ownerId: pilot.ownerId,
-    x: pilot.x + turn * (diagonal ? 5 : 7),
-    y: pilot.y - (turn === 0 ? 10 : diagonal ? 8 : 4),
-    vx: horizontalSpeed,
-    vy: verticalSpeed,
+    x: pilot.x + horizontalDirection * 7,
+    y: pilot.y - 4 + verticalDirection * 7,
+    vx: horizontalDirection * PILOT_BULLET_SPEED,
+    vy: verticalDirection * PILOT_BULLET_SPEED,
     life: 1.65,
   });
   pushEvent(state, "pilot-gun", pilot.ownerId, undefined, pilot.x, pilot.y);
@@ -1009,7 +1017,7 @@ function destroyPlane(
       falling: !seaWreck,
       wreck: seaWreck,
       strandedFor: 0,
-      aim: 0,
+      aimAngle: 0,
       fireCooldown: 0,
       invulnerableFor: 0.3,
     });
@@ -1098,12 +1106,13 @@ export function botInput(state: GameState, botId: string): PilotInput {
     const target = state.players.find((candidate) => candidate.id !== botId && candidate.alive && !areTeammates(state, bot, candidate));
     if (!pilot || !target) return { turn: 0, fire: false, bomb: false, roll: false };
     const dx = wrappedDistance(target.x, pilot.x);
+    const desiredAim = clamp(Math.atan2(dx, Math.max(1, pilot.y - target.y)), -PILOT_AIM_LIMIT, PILOT_AIM_LIMIT);
+    const aimDifference = desiredAim - (Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0);
     return {
-      turn: Math.abs(dx) < 20 ? 0 : dx > 0 ? 1 : -1,
-      fire: true,
+      turn: Math.abs(aimDifference) < 0.035 ? 0 : aimDifference > 0 ? 1 : -1,
+      fire: Math.abs(aimDifference) < 0.14,
       bomb: false,
       roll: false,
-      aimUp: target.y < pilot.y - 18,
     };
   }
   const opponents = state.players.filter(

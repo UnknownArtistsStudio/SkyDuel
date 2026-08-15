@@ -172,14 +172,11 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
     context.fillStyle = color;
     context.fillRect(-5, -3, 10, 11);
     context.fillStyle = "#17131f";
-    const aim = pilot.aim ?? 0;
-    if (aim === 0) context.fillRect(-1, -17, 3, 10);
-    else if (Math.abs(aim) === 2) context.fillRect(aim > 0 ? 3 : -14, -6, 11, 3);
-    else {
-      const direction = aim > 0 ? 1 : -1;
-      context.fillRect(direction > 0 ? 3 : -7, -9, 5, 3);
-      context.fillRect(direction > 0 ? 6 : -10, -12, 5, 3);
-      context.fillRect(direction > 0 ? 9 : -13, -15, 5, 3);
+    const aimAngle = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pilot.aimAngle ?? 0));
+    for (const distance of [4, 7, 10]) {
+      const gunX = Math.round(Math.sin(aimAngle) * distance);
+      const gunY = Math.round(-6 - Math.cos(aimAngle) * distance);
+      context.fillRect(gunX - 1, gunY - 1, 3, 3);
     }
     context.fillRect(-7, 8, 5, 7);
     context.fillRect(2, 8, 5, 7);

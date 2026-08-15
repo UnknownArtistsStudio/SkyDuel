@@ -245,19 +245,28 @@ test("parachute mode ejects an armed vulnerable pilot after every weapon takedow
   stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
   assert.ok(state.pilotBullets.some((bullet) => bullet.ownerId === carrier.id));
 
+  for (let frame = 0; frame < 10; frame += 1) {
+    stepGame(state, { carrier: { turn: 1, fire: false, bomb: false, roll: false } }, FRAME);
+  }
   state.groundPilots[0].fireCooldown = 0;
-  stepGame(state, { carrier: { turn: 1, fire: true, bomb: false, roll: false } }, 0);
+  stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
   const angledShot = state.pilotBullets.at(-1);
-  assert.ok(angledShot.vx > 300 && angledShot.vy === 0, "the pilot gun did not aim sideways");
-
-  state.groundPilots[0].fireCooldown = 0;
-  stepGame(state, { carrier: { turn: 1, fire: true, bomb: false, roll: false, aimUp: true } }, 0);
-  const diagonalShot = state.pilotBullets.at(-1);
   assert.ok(
-    diagonalShot.vx > 200 && diagonalShot.vx < 300 && diagonalShot.vy < -200,
-    "the pilot gun did not aim diagonally",
+    angledShot.vx > 140 && angledShot.vx < 190 && angledShot.vy < -270,
+    "the pilot gun did not fire along a smooth intermediate angle",
   );
-  assert.equal(state.groundPilots[0].aim, 1);
+
+  for (let frame = 0; frame < 35; frame += 1) {
+    stepGame(state, { carrier: { turn: 1, fire: false, bomb: false, roll: false } }, FRAME);
+  }
+  state.groundPilots[0].fireCooldown = 0;
+  stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
+  const sidewaysShot = state.pilotBullets.at(-1);
+  assert.ok(
+    sidewaysShot.vx > 329 && Math.abs(sidewaysShot.vy) < 0.001,
+    "the pilot gun did not reach the end of its 180-degree arc",
+  );
+  assert.equal(state.groundPilots[0].aimAngle, Math.PI / 2);
 
   const pilot = state.groundPilots[0];
   pilot.invulnerableFor = 0;
@@ -451,8 +460,8 @@ test("pilot machine-gun bullets can hit rival ground pilots", () => {
   shooter.alive = false;
   target.alive = false;
   state.groundPilots = [
-    { ownerId: shooter.id, x: 300, y: 591, vx: 0, vy: 0, falling: false, wreck: true, strandedFor: 0, aim: 1, fireCooldown: 0, invulnerableFor: 0 },
-    { ownerId: target.id, x: 500, y: 591, vx: 0, vy: 0, falling: false, wreck: true, strandedFor: 0, aim: -1, fireCooldown: 0, invulnerableFor: 0 },
+    { ownerId: shooter.id, x: 300, y: 591, vx: 0, vy: 0, falling: false, wreck: true, strandedFor: 0, aimAngle: Math.PI / 2, fireCooldown: 0, invulnerableFor: 0 },
+    { ownerId: target.id, x: 500, y: 591, vx: 0, vy: 0, falling: false, wreck: true, strandedFor: 0, aimAngle: -Math.PI / 2, fireCooldown: 0, invulnerableFor: 0 },
   ];
   stepGame(state, { shooter: { turn: 1, fire: true, bomb: false, roll: false } }, 0);
   for (let frame = 0; frame < 16 && state.groundPilots.some((pilot) => pilot.ownerId === target.id); frame += 1) {

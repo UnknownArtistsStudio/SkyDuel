@@ -86,7 +86,7 @@ declare global {
   }
 }
 
-const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: false, aimUp: false };
+const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: false };
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
 const TITLE_MUSIC_LEAD_IN = 1200;
@@ -698,10 +698,6 @@ export function SkyDuel() {
     inputRef.current = { ...inputRef.current, turn };
   }, []);
 
-  const setArcadeAimUp = useCallback((aimUp: boolean) => {
-    inputRef.current = { ...inputRef.current, aimUp };
-  }, []);
-
   const setArcadeFire = useCallback((fire: boolean) => {
     if (fire) void audioRef.current?.resume();
     inputRef.current = { ...inputRef.current, fire };
@@ -728,7 +724,6 @@ export function SkyDuel() {
       const right = onFoot
         ? ["d", "arrowright"].some((key) => keys.has(key))
         : ["d", "arrowright", "s", "arrowdown"].some((key) => keys.has(key));
-      const aimUp = onFoot && ["w", "arrowup"].some((key) => keys.has(key));
       const rollingChord = !onFoot && left && right;
       const triggerRoll = rollingChord && rollArmed;
       if (triggerRoll) rollArmed = false;
@@ -738,7 +733,6 @@ export function SkyDuel() {
         fire: keys.has(" "),
         bomb: inputRef.current.bomb,
         roll: inputRef.current.roll || triggerRoll,
-        aimUp,
       };
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1029,7 +1023,6 @@ export function SkyDuel() {
               pilotOnFoot={readout.onFoot}
               specialWeapon={readout.onFoot ? null : readout.missiles > 0 ? "MISSILE" : readout.bombs > 0 ? "BOMB" : null}
               onTurn={setArcadeTurn}
-              onAimUp={setArcadeAimUp}
               onRoll={rollArcadePlane}
               onFire={setArcadeFire}
               onBomb={dropArcadeBomb}
@@ -1132,8 +1125,8 @@ export function SkyDuel() {
                 </p>
                 <p className="menu-intro" aria-label="Parachute mode rule">
                   PARACHUTE MODE / EVERY WEAPON TAKEDOWN EJECTS THE PILOT<br />
-                  ON FOOT / FIRE = UP / LEFT OR RIGHT + FIRE = SIDE / ADD W OR UP = DIAGONAL<br />
-                  PHONE / PUSH STICK UP + LEFT OR RIGHT FOR DIAGONAL AIM / 6 PILOT HITS = 1 PLANE HIT
+                  ON FOOT / HOLD LEFT OR RIGHT TO ROTATE GUN / FIRE AT ANY ANGLE<br />
+                  PHONE / MOVE STICK LEFT OR RIGHT TO AIM / 6 PILOT HITS = 1 PLANE HIT
                 </p>
                 <p className="menu-intro" aria-label="Three hit damage rule">
                   3 HIT MODE / DAMAGED / SMOKE / EXPLODE
@@ -1191,7 +1184,6 @@ function ArcadeControls({
   pilotOnFoot,
   specialWeapon,
   onTurn,
-  onAimUp,
   onRoll,
   onFire,
   onBomb,
@@ -1203,7 +1195,6 @@ function ArcadeControls({
   pilotOnFoot: boolean;
   specialWeapon: "MISSILE" | "BOMB" | null;
   onTurn: (turn: -1 | 0 | 1) => void;
-  onAimUp: (aimUp: boolean) => void;
   onRoll: () => void;
   onFire: (fire: boolean) => void;
   onBomb: () => void;
@@ -1213,7 +1204,6 @@ function ArcadeControls({
   const stickPointerRef = useRef<number | null>(null);
   const stickMovedRef = useRef(false);
   const [stickX, setStickX] = useState(0);
-  const [stickY, setStickY] = useState(0);
   const [firing, setFiring] = useState(false);
 
   const releaseStick = useCallback(() => {
@@ -1222,28 +1212,20 @@ function ArcadeControls({
     stickPointerRef.current = null;
     stickMovedRef.current = false;
     setStickX(0);
-    setStickY(0);
     onTurn(0);
-    onAimUp(false);
     if (shouldRoll) onRoll();
-  }, [disabled, onAimUp, onRoll, onTurn, pilotOnFoot]);
+  }, [disabled, onRoll, onTurn, pilotOnFoot]);
 
   const moveStick = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (stickPointerRef.current !== event.pointerId) return;
     event.preventDefault();
     const bounds = event.currentTarget.getBoundingClientRect();
     const travel = Math.min(28, bounds.width * 0.28);
-    const verticalTravel = Math.min(13, bounds.height * 0.24);
     const offset = Math.max(-travel, Math.min(travel, event.clientX - bounds.left - bounds.width / 2));
-    const verticalOffset = pilotOnFoot
-      ? Math.max(-verticalTravel, Math.min(verticalTravel, event.clientY - bounds.top - bounds.height / 2))
-      : 0;
-    if (Math.abs(offset) > 7 || Math.abs(verticalOffset) > 7) stickMovedRef.current = true;
+    if (Math.abs(offset) > 7) stickMovedRef.current = true;
     setStickX(offset);
-    setStickY(verticalOffset);
     onTurn(offset < -7 ? -1 : offset > 7 ? 1 : 0);
-    onAimUp(verticalOffset < -7);
-  }, [onAimUp, onTurn, pilotOnFoot]);
+  }, [onTurn]);
 
   return (
     <div className="arcade-controls" aria-label="Arcade flight controls">
@@ -1254,7 +1236,7 @@ function ArcadeControls({
         aria-label={pilotOnFoot ? "Move and aim joystick" : "Turn joystick"}
         style={{
           "--stick-x": `${disabled ? 0 : stickX}px`,
-          "--stick-y": `${disabled ? 0 : stickY}px`,
+          "--stick-y": "0px",
         } as React.CSSProperties}
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
@@ -1272,7 +1254,7 @@ function ArcadeControls({
       >
         <span className="stick-rail" />
         <span className="stick-knob" />
-        <span className="stick-label">{pilotOnFoot ? "MOVE / AIM" : "TURN / ROLL"}</span>
+        <span className="stick-label">{pilotOnFoot ? "ROTATE / MOVE" : "TURN / ROLL"}</span>
       </button>
 
       <div className="arcade-actions">
@@ -1417,7 +1399,6 @@ function sanitizeInput(input: PilotInput): PilotInput {
     fire: Boolean(input?.fire),
     bomb: Boolean(input?.bomb),
     roll: Boolean(input?.roll),
-    aimUp: Boolean(input?.aimUp),
   };
 }
 
