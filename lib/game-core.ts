@@ -10,9 +10,6 @@ export const RELOAD_TIME = 1.35;
 export const ROLL_DURATION = 0.58;
 export const ROLL_RECHARGE = 1.35;
 export const MISSILE_DROP_TIME = 0.42;
-export const TOWER_X = WORLD_WIDTH / 2;
-export const TOWER_TOP_Y = 490;
-export const TOWER_BUZZ_DURATION = 3.2;
 
 export type MatchMode = "free-for-all" | "teams";
 export type Team = 0 | 1;
@@ -127,8 +124,7 @@ export type GameEvent = {
     | "bomb-pickup"
     | "missile-award"
     | "missile-launch"
-    | "missile-hit"
-    | "tower-buzz";
+    | "missile-hit";
   playerId: string;
   targetId?: string;
   x?: number;
@@ -154,7 +150,6 @@ export type GameState = {
   scoreLimit: ScoreLimit;
   bombsEnabled: boolean;
   winner: GameWinner | null;
-  towerBuzz: { playerId: string; time: number } | null;
 };
 
 const COLORS = ["#f02b10", "#00ad38", "#f2a913", "#fffdf8", "#17131f", "#f02b10"];
@@ -192,7 +187,6 @@ export function createGame(
     scoreLimit,
     bombsEnabled,
     winner: null,
-    towerBuzz: null,
   };
 }
 
@@ -309,8 +303,6 @@ export function stepGame(
     }
 
     const input = inputs[plane.id] ?? { turn: 0, fire: false, bomb: false, roll: false };
-    const previousX = plane.x;
-    const previousY = plane.y;
     const speed = planeSpeed(plane);
     const forwardX = Math.cos(plane.angle);
     const forwardY = Math.sin(plane.angle);
@@ -367,8 +359,6 @@ export function stepGame(
     }
     plane.invulnerableFor = Math.max(0, plane.invulnerableFor - safeDt);
 
-    detectTowerBuzz(state, plane, previousX, previousY);
-
     if (plane.x < -24) plane.x = WORLD_WIDTH + 24;
     if (plane.x > WORLD_WIDTH + 24) plane.x = -24;
     if (plane.y < 24) {
@@ -413,22 +403,6 @@ export function stepGame(
     state.missiles = [];
     state.bombPowerUps = [];
   }
-}
-
-function detectTowerBuzz(state: GameState, plane: Plane, previousX: number, previousY: number) {
-  if (state.towerBuzz || plane.invulnerableFor > 0) return;
-  const crossedTower =
-    (previousX < TOWER_X && plane.x >= TOWER_X) ||
-    (previousX > TOWER_X && plane.x <= TOWER_X);
-  if (!crossedTower || Math.abs(plane.vx) < 100) return;
-
-  const passY = (previousY + plane.y) / 2;
-  const clearedRoof = passY <= TOWER_TOP_Y - PLANE_RADIUS;
-  const flewCloseEnough = passY >= TOWER_TOP_Y - 72;
-  if (!clearedRoof || !flewCloseEnough) return;
-
-  state.towerBuzz = { playerId: plane.id, time: state.time };
-  pushEvent(state, "tower-buzz", plane.id, undefined, TOWER_X, passY);
 }
 
 function fireBullet(state: GameState, plane: Plane) {
@@ -769,7 +743,6 @@ export function resetRound(state: GameState) {
   state.bombSpawnIn = nextBombDelay(true);
   state.events = [];
   state.winner = null;
-  state.towerBuzz = null;
   for (const plane of state.players) {
     plane.score = 0;
     plane.deaths = 0;
