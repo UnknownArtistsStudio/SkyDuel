@@ -58,15 +58,16 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /TRANSMITTING/);
   assert.match(component, /chat-request/);
   assert.match(component, /ArcadeControls/);
-  assert.match(component, /MESSAGE &gt;/);
   assert.match(component, /MediaRecorder/);
   assert.match(component, /voice-request/);
   assert.match(component, /BOMB PICKUPS/);
   assert.match(component, /RADIO SENT/);
   assert.match(component, /RADIO CHAT \/ ALLOW MIC FIRST TIME/);
   assert.match(component, /HOLD T \+ SPEAK \/ RELEASE TO SEND \/ 3 SEC MAX/);
-  assert.match(component, /PHONE: HOLD TALK \/ ENTER: TYPE MESSAGE/);
+  assert.match(component, /PHONE: HOLD TALK/);
+  assert.match(component, /MISSILES \/ EVERY 3 KILLS EARNS 1 \/ UNUSED MISSILES STACK/);
   assert.match(component, /NOT STORED/);
+  assert.doesNotMatch(component, /chatInputOpen|TYPE MESSAGE|ENTER FOR TEXT|ENTER: TYPE MESSAGE|MESSAGE &gt;/);
   assert.match(component, /A\+D ROLL/);
   assert.match(component, /ROLL RESET/);
   assert.match(component, /TITLE_MUSIC_LEAD_IN/);
@@ -105,6 +106,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyDuelPixel"/);
   assert.match(styles, /\.arcade-controls/);
+  assert.doesNotMatch(styles, /chat-composer/);
   assert.match(styles, /safe-area-inset-bottom/);
   assert.match(styles, /pointer: coarse/);
   assert.match(layout, /viewportFit: "cover"/);
