@@ -66,6 +66,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /HOLD T \+ SPEAK \/ RELEASE TO SEND \/ 3 SEC MAX/);
   assert.match(component, /PHONE: HOLD TALK/);
   assert.match(component, /MISSILES \/ EVERY 3 KILLS EARNS 1 \/ UNUSED MISSILES STACK/);
+  assert.match(component, /GROUND MISSILE \/ AIM LEFT OR RIGHT \/ B FIRES ROCKET/);
+  assert.match(component, /PILOT ROCKET READY \/ B FIRE/);
   assert.match(component, /NOT STORED/);
   assert.doesNotMatch(component, /chatInputOpen|TYPE MESSAGE|ENTER FOR TEXT|ENTER: TYPE MESSAGE|MESSAGE &gt;/);
   assert.match(component, /A\+D ROLL/);
@@ -111,6 +113,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /ROLL_DURATION/);
   assert.match(core, /ROLL_RECHARGE/);
   assert.match(core, /missileMilestones/);
+  assert.match(core, /launchPilotMissile/);
   assert.match(core, /cloudPosition/);
   assert.match(core, /PILOT_GUN_HITS = 6/);
   assert.match(core, /PILOT_AIM_SPEED/);

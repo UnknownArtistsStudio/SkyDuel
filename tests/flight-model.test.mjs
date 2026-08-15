@@ -471,6 +471,41 @@ test("pilot machine-gun bullets can hit rival ground pilots", () => {
   assert.ok(state.events.some((event) => event.type === "pilot-shot"));
 });
 
+test("an ejected pilot can fire a carried missile from the ground", () => {
+  const state = createGame("free-for-all", null, false, true, 1);
+  const launcher = addPlayer(state, "launcher", "LAUNCHER");
+  const attacker = addPlayer(state, "attacker", "ATTACKER");
+  launcher.invulnerableFor = 0;
+  attacker.invulnerableFor = 0;
+  launcher.missiles = 1;
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: launcher.x,
+    y: launcher.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  const pilot = state.groundPilots.find((candidate) => candidate.ownerId === launcher.id);
+  assert.ok(pilot?.falling);
+
+  stepGame(state, { launcher: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
+  assert.equal(launcher.missiles, 1, "the parachuting pilot fired before reaching the ground");
+  assert.equal(state.missiles.length, 0);
+
+  pilot.falling = false;
+  pilot.aimAngle = Math.PI / 4;
+  stepGame(state, { launcher: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
+  assert.equal(launcher.missiles, 0);
+  assert.equal(state.missiles.length, 1);
+  assert.equal(state.missiles[0].boosted, true);
+  assert.equal(state.missiles[0].dropFor, 0);
+  assert.ok(state.missiles[0].vx > 370 && state.missiles[0].vy < -370);
+  assert.ok(state.events.some((event) => event.type === "missile-launch" && event.playerId === launcher.id));
+});
+
 test("every pilot earns an accumulating missile at each three-kill milestone", () => {
   const state = createGame("free-for-all", null);
   const leader = addPlayer(state, "leader", "LEADER");

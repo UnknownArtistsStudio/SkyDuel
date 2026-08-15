@@ -614,8 +614,10 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
     : 0;
   for (const pilot of state.groundPilots) {
     const input = inputs[pilot.ownerId] ?? { turn: 0, fire: false, bomb: false, roll: false };
+    const owner = state.players.find((plane) => plane.id === pilot.ownerId);
     pilot.invulnerableFor = Math.max(0, pilot.invulnerableFor - dt);
     pilot.fireCooldown = Math.max(0, pilot.fireCooldown - dt);
+    if (owner) owner.specialCooldown = Math.max(0, owner.specialCooldown - dt);
     pilot.aimAngle = clamp(
       (Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0) + input.turn * PILOT_AIM_SPEED * dt,
       -PILOT_AIM_LIMIT,
@@ -645,6 +647,13 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
     if (pilot.x < 0) pilot.x += WORLD_WIDTH;
     if (pilot.x > WORLD_WIDTH) pilot.x -= WORLD_WIDTH;
     if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot);
+    if (
+      !pilot.falling &&
+      input.bomb &&
+      owner &&
+      owner.missiles > 0 &&
+      owner.specialCooldown <= 0
+    ) launchPilotMissile(state, owner, pilot);
   }
 
   const sinkingPilots = state.groundPilots.filter(
@@ -684,6 +693,32 @@ function firePilotGun(
     life: 1.65,
   });
   pushEvent(state, "pilot-gun", pilot.ownerId, undefined, pilot.x, pilot.y);
+}
+
+function launchPilotMissile(state: GameState, owner: Plane, pilot: GroundPilot) {
+  const aimAngle = clamp(
+    Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0,
+    -PILOT_AIM_LIMIT,
+    PILOT_AIM_LIMIT,
+  );
+  const missileAngle = aimAngle - Math.PI / 2;
+  const directionX = Math.cos(missileAngle);
+  const directionY = Math.sin(missileAngle);
+  owner.missiles -= 1;
+  owner.specialCooldown = 0.45;
+  state.missiles.push({
+    id: state.nextMissileId++,
+    ownerId: owner.id,
+    x: pilot.x + directionX * 13,
+    y: pilot.y - 4 + directionY * 13,
+    vx: directionX * MISSILE_SPEED,
+    vy: directionY * MISSILE_SPEED,
+    angle: missileAngle,
+    dropFor: 0,
+    boosted: true,
+    life: MISSILE_LIFE,
+  });
+  pushEvent(state, "missile-launch", owner.id, undefined, pilot.x, pilot.y);
 }
 
 function updatePilotBullets(state: GameState, dt: number) {

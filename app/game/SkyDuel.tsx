@@ -961,7 +961,11 @@ export function SkyDuel() {
                 {readout.onFoot
                   ? readout.parachuting
                     ? "PARACHUTE / FIRE"
-                    : "PILOT MG / 5 WAY AIM"
+                    : readout.missiles > 0
+                      ? readout.missiles > 1
+                        ? `PILOT ROCKETS ${readout.missiles} / B FIRE`
+                        : "PILOT ROCKET READY / B FIRE"
+                      : "PILOT MG / 180 AIM"
                   : readout.protected
                   ? "SAFE / GUNS OFF"
                   : readout.stalled
@@ -1021,7 +1025,11 @@ export function SkyDuel() {
               disabled={!readout.alive || Boolean(winner)}
               isTalking={isTalking}
               pilotOnFoot={readout.onFoot}
-              specialWeapon={readout.onFoot ? null : readout.missiles > 0 ? "MISSILE" : readout.bombs > 0 ? "BOMB" : null}
+              specialWeapon={readout.missiles > 0 && (!readout.onFoot || !readout.parachuting)
+                ? "MISSILE"
+                : !readout.onFoot && readout.bombs > 0
+                  ? "BOMB"
+                  : null}
               onTurn={setArcadeTurn}
               onRoll={rollArcadePlane}
               onFire={setArcadeFire}
@@ -1126,6 +1134,7 @@ export function SkyDuel() {
                 <p className="menu-intro" aria-label="Parachute mode rule">
                   PARACHUTE MODE / EVERY WEAPON TAKEDOWN EJECTS THE PILOT<br />
                   ON FOOT / HOLD LEFT OR RIGHT TO ROTATE GUN / FIRE AT ANY ANGLE<br />
+                  GROUND MISSILE / AIM LEFT OR RIGHT / B FIRES ROCKET<br />
                   PHONE / MOVE STICK LEFT OR RIGHT TO AIM / 6 PILOT HITS = 1 PLANE HIT
                 </p>
                 <p className="menu-intro" aria-label="Three hit damage rule">
