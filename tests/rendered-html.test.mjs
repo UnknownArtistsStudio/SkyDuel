@@ -73,6 +73,12 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /TITLE_MUSIC_LEAD_IN/);
   assert.match(component, /MISSILE READY/);
   assert.match(component, /MISSILES/);
+  assert.match(component, /SpeechSynthesisUtterance/);
+  assert.match(component, /BOMB HATCH OPEN/);
+  assert.match(component, /MISSILE ARMED/);
+  assert.match(component, /EJECT EJECT/);
+  assert.match(component, /MAYDAY MAYDAY/);
+  assert.match(component, /PARACHUTE EQUIPPED/);
   assert.match(component, /PLANE DAMAGE/);
   assert.match(component, /REVENGE PILOT/);
   assert.match(component, /6 PILOT HITS = 1 PLANE HIT/);

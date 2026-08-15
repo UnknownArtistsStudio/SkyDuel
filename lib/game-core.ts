@@ -171,6 +171,7 @@ export type GameEvent = {
     | "missile-launch"
     | "missile-hit"
     | "plane-hit"
+    | "mayday"
     | "revenge-spawn"
     | "revenge-pickup"
     | "pilot-eject"
@@ -908,6 +909,9 @@ function applyPlaneHit(state: GameState, plane: Plane, attackerId: string): bool
     return true;
   }
   pushEvent(state, "plane-hit", attackerId, plane.id, plane.x, plane.y);
+  if (state.planeHits === 3 && plane.damage === 2) {
+    pushEvent(state, "mayday", attackerId, plane.id, plane.x, plane.y);
+  }
   return false;
 }
 
@@ -1012,7 +1016,7 @@ function destroyPlane(
       fireCooldown: 0,
       invulnerableFor: 0.3,
     });
-    pushEvent(state, "pilot-eject", plane.id, targetId, plane.x, plane.y);
+    if (ejects) pushEvent(state, "pilot-eject", plane.id, targetId, plane.x, plane.y);
   }
 }
 

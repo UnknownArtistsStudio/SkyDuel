@@ -104,6 +104,7 @@ export function SkyDuel() {
   const audioRef = useRef<AudioContext | null>(null);
   const engineSoundRef = useRef<EngineSound | null>(null);
   const musicSoundRef = useRef<MusicSound>({ master: null, mode: "silent", nextBeatAt: 0, step: 0 });
+  const computerVoiceBusyRef = useRef(0);
   const chatBubblesRef = useRef<ChatBubble[]>([]);
   const chatRateRef = useRef(new Map<string, number>());
   const voiceRateRef = useRef(new Map<string, number>());
@@ -454,6 +455,8 @@ export function SkyDuel() {
       voiceCapturePendingRef,
     );
     clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
+    window.speechSynthesis?.cancel();
+    computerVoiceBusyRef.current = 0;
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     recognitionTimerRef.current = null;
     isTalkingRef.current = false;
@@ -833,16 +836,23 @@ export function SkyDuel() {
         engineSoundRef.current,
         localPlane,
         screen === "playing" && !state.winner,
-        isTalkingRef.current || voicePlayingRef.current,
+        isTalkingRef.current || voicePlayingRef.current || computerVoiceBusyRef.current > 0,
       );
       updateMusic(
         audioRef.current,
         musicSoundRef.current,
         screen,
-        isTalkingRef.current || voicePlayingRef.current,
+        isTalkingRef.current || voicePlayingRef.current || computerVoiceBusyRef.current > 0,
         state.groundPilots.length > 0 && !state.winner,
       );
-      playNewSounds(state, lastSoundEventRef, audioRef);
+      playNewSounds(
+        state,
+        lastSoundEventRef,
+        audioRef,
+        localIdRef.current,
+        computerVoiceBusyRef,
+        flashRadio,
+      );
       if (canvasRef.current) {
         renderGame(canvasRef.current, state, localIdRef.current, time, chatBubblesRef.current);
       }
@@ -863,7 +873,7 @@ export function SkyDuel() {
     };
     animationFrame = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(animationFrame);
-  }, [mode, screen, stopTalking]);
+  }, [flashRadio, mode, screen, stopTalking]);
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -875,6 +885,8 @@ export function SkyDuel() {
       voiceCapturePendingRef,
     );
     clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
+    window.speechSynthesis?.cancel();
+    computerVoiceBusyRef.current = 0;
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     if (radioMessageTimerRef.current !== null) window.clearTimeout(radioMessageTimerRef.current);
     if (titleStartTimerRef.current !== null) window.clearTimeout(titleStartTimerRef.current);
@@ -1634,9 +1646,16 @@ function playNewSounds(
   state: GameState,
   lastEventRef: React.MutableRefObject<number>,
   audioRef: React.MutableRefObject<AudioContext | null>,
+  localPlayerId: string,
+  computerVoiceBusyRef: React.MutableRefObject<number>,
+  flashRadio: (text: string, duration?: number) => void,
 ) {
   const context = audioRef.current;
   if (!context) return;
+  const announce = (message: string) => {
+    computerVoice(context, message, computerVoiceBusyRef);
+    flashRadio(message, 1700);
+  };
   for (const event of state.events) {
     if (event.id <= lastEventRef.current) continue;
     lastEventRef.current = event.id;
@@ -1653,21 +1672,70 @@ function playNewSounds(
     if (event.type === "bomb-pickup") {
       suspenseFanfare(context);
     }
-    if (event.type === "bomb-drop") tone(context, 150, 0.13, "square", 0.035);
+    if (event.type === "bomb-drop") {
+      tone(context, 150, 0.13, "square", 0.035);
+      if (event.playerId === localPlayerId) announce("BOMB HATCH OPEN");
+    }
     if (event.type === "bomb-explosion") pixelBombExplosion(context);
-    if (event.type === "missile-award") missileAwardFanfare(context);
+    if (event.type === "missile-award") {
+      missileAwardFanfare(context);
+      if (event.playerId === localPlayerId) announce("MISSILE ARMED");
+    }
     if (event.type === "missile-launch") pixelMissileLaunch(context);
     if (event.type === "missile-hit") pixelMissileHit(context);
     if (event.type === "plane-hit") tone(context, 95, 0.1, "square", 0.028);
+    if (event.type === "mayday" && event.targetId === localPlayerId) announce("MAYDAY MAYDAY");
     if (event.type === "revenge-spawn") revengeCue(context);
-    if (event.type === "revenge-pickup") suspenseFanfare(context);
-    if (event.type === "pilot-eject") sweptTone(context, 420, 150, 0.28, "square", 0.024);
+    if (event.type === "revenge-pickup") {
+      suspenseFanfare(context);
+      if (event.playerId === localPlayerId) announce("PARACHUTE EQUIPPED");
+    }
+    if (event.type === "pilot-eject") {
+      sweptTone(context, 420, 150, 0.28, "square", 0.024);
+      if (event.playerId === localPlayerId) announce("EJECT EJECT");
+    }
     if (event.type === "pilot-gun") tone(context, 520, 0.035, "square", 0.018);
     if (event.type === "pilot-shot") pixelExplosion(context);
     if (event.type === "pilot-bombed") pixelBombExplosion(context);
     if (event.type === "pilot-vaporized") sweptTone(context, 940, 90, 0.32, "square", 0.04);
     if (event.type === "victory") victoryFanfare(context);
   }
+}
+
+function computerVoice(
+  context: AudioContext,
+  message: string,
+  busyRef: React.MutableRefObject<number>,
+) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(message.replaceAll(" ", ". "));
+  const voices = window.speechSynthesis.getVoices();
+  const preferredVoice = voices.find((voice) => /zarvox/i.test(voice.name))
+    ?? voices.find((voice) => /fred|ralph|trinoids/i.test(voice.name))
+    ?? voices.find((voice) => /^en[-_]/i.test(voice.lang));
+  if (preferredVoice) utterance.voice = preferredVoice;
+  utterance.lang = "en-US";
+  utterance.rate = 0.72;
+  utterance.pitch = 0.48;
+  utterance.volume = 0.62;
+
+  busyRef.current += 1;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    busyRef.current = Math.max(0, busyRef.current - 1);
+  };
+  utterance.onend = release;
+  utterance.onerror = release;
+
+  const start = context.currentTime;
+  scheduleEffectTone(context, 720, start, 0.045, 0.018);
+  scheduleEffectTone(context, 510, start + 0.065, 0.055, 0.016);
+  window.speechSynthesis.speak(utterance);
 }
 
 function revengeCue(context: AudioContext) {
