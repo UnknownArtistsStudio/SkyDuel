@@ -9,6 +9,7 @@ import {
   MISSILE_DROP_TIME,
   planeSpeed,
   resetRound,
+  ROLL_RECHARGE,
   stepGame,
 } from "../lib/game-core.ts";
 
@@ -171,6 +172,22 @@ test("a timed barrel roll dodges bullets but ends cleanly", () => {
   defender.rollFor = 0;
   stepGame(state, {}, 0);
   assert.equal(defender.alive, false, "the dodge remained active after the roll ended");
+});
+
+test("barrel rolls require a short recharge before another dodge", () => {
+  const state = createGame("free-for-all", null);
+  const pilot = addPlayer(state, "pilot", "PILOT");
+  pilot.invulnerableFor = 0;
+
+  stepGame(state, { pilot: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
+  assert.equal(pilot.rollCooldown, ROLL_RECHARGE);
+  pilot.rollFor = 0;
+  stepGame(state, { pilot: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
+  assert.equal(pilot.rollFor, 0, "a second roll started during the recharge beat");
+
+  for (let frame = 0; frame < 28; frame += 1) stepGame(state, {}, 0.05);
+  stepGame(state, { pilot: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
+  assert.ok(pilot.rollFor > 0, "the roll did not return after recharging");
 });
 
 test("a three-kill lead awards one missile and the special control launches it", () => {

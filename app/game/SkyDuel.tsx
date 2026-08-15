@@ -87,6 +87,7 @@ declare global {
 const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: false };
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
+const TITLE_MUSIC_LEAD_IN = 1200;
 
 export function SkyDuel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,6 +116,8 @@ export function SkyDuel() {
   const recognitionStoppingRef = useRef(false);
   const recognitionTimerRef = useRef<number | null>(null);
   const radioMessageTimerRef = useRef<number | null>(null);
+  const titleStartTimerRef = useRef<number | null>(null);
+  const startPendingRef = useRef(false);
   const recognitionTranscriptRef = useRef("");
   const isTalkingRef = useRef(false);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -143,6 +146,7 @@ export function SkyDuel() {
       stalled: false,
       protected: false,
       rolling: false,
+      rollCooldown: 0,
       alive: false,
       respawnIn: 0,
       bombs: 0,
@@ -333,8 +337,14 @@ export function SkyDuel() {
   }, [acceptChat, acceptVoice, showChat]);
 
   const pressStart = useCallback(() => {
+    if (startPendingRef.current) return;
+    startPendingRef.current = true;
     wakeAudio(audioRef, engineSoundRef);
-    setScreen("menu");
+    titleStartTimerRef.current = window.setTimeout(() => {
+      titleStartTimerRef.current = null;
+      startPendingRef.current = false;
+      setScreen("menu");
+    }, TITLE_MUSIC_LEAD_IN);
   }, []);
 
   const beginPractice = useCallback(() => {
@@ -854,6 +864,7 @@ export function SkyDuel() {
     clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     if (radioMessageTimerRef.current !== null) window.clearTimeout(radioMessageTimerRef.current);
+    if (titleStartTimerRef.current !== null) window.clearTimeout(titleStartTimerRef.current);
     void roomRef.current?.close();
     engineSoundRef.current?.oscillator.stop();
     void audioRef.current?.close();
@@ -914,13 +925,15 @@ export function SkyDuel() {
                     ? "STALL / NOSE DOWN"
                     : readout.rolling
                       ? "BARREL ROLL"
-                      : readout.missiles > 0
-                        ? "MISSILE READY / B FIRE"
-                        : readout.bombs > 0
-                          ? "BOMB READY / B DROP"
-                          : readout.reloadIn > 0
-                            ? `GUN RELOAD ${readout.reloadIn.toFixed(1)}`
-                            : `GUN ${readout.shotsRemaining}/3 / A+D ROLL`}
+                      : readout.rollCooldown > 0
+                        ? `ROLL RESET ${readout.rollCooldown.toFixed(1)}`
+                        : readout.missiles > 0
+                          ? "MISSILE READY / B FIRE"
+                          : readout.bombs > 0
+                            ? "BOMB READY / B DROP"
+                            : readout.reloadIn > 0
+                              ? `GUN RELOAD ${readout.reloadIn.toFixed(1)}`
+                              : `GUN ${readout.shotsRemaining}/3 / A+D ROLL`}
               </span>
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
@@ -1364,15 +1377,14 @@ function updateMusic(
     music.master.connect(context.destination);
   }
 
-  const nextMode: MusicMode = screen === "playing" ? "game" : screen === "title" ? "silent" : "menu";
+  const nextMode: MusicMode = screen === "playing" ? "game" : "menu";
   if (music.mode !== nextMode) {
     music.mode = nextMode;
     music.step = 0;
     music.nextBeatAt = context.currentTime + 0.04;
   }
-  const fullVolume = nextMode === "menu" ? 0.32 : nextMode === "game" ? 0.13 : 0.0001;
+  const fullVolume = nextMode === "menu" ? 0.32 : 0.13;
   music.master.gain.setTargetAtTime(ducked ? 0.018 : fullVolume, context.currentTime, 0.16);
-  if (nextMode === "silent") return;
 
   const beatLength = nextMode === "menu" ? 0.72 : 0.9;
   while (music.nextBeatAt < context.currentTime + 0.3) {

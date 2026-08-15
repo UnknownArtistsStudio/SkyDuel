@@ -64,6 +64,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /BOMB PICKUPS/);
   assert.match(component, /RADIO SENT/);
   assert.match(component, /A\+D ROLL/);
+  assert.match(component, /ROLL RESET/);
+  assert.match(component, /TITLE_MUSIC_LEAD_IN/);
   assert.match(component, /MISSILE READY/);
   assert.match(component, /scheduleMenuBeat/);
   assert.match(component, /scheduleGameBeat/);
@@ -79,6 +81,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /bombPowerUps/);
   assert.match(core, /MAGAZINE_SIZE = 3/);
   assert.match(core, /ROLL_DURATION/);
+  assert.match(core, /ROLL_RECHARGE/);
   assert.match(core, /missileLeadAwarded/);
   assert.match(core, /cloudPosition/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);

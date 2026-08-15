@@ -8,6 +8,7 @@ export const CLOUD_COUNT = 2;
 export const MAGAZINE_SIZE = 3;
 export const RELOAD_TIME = 1.35;
 export const ROLL_DURATION = 0.58;
+export const ROLL_RECHARGE = 1.35;
 export const MISSILE_DROP_TIME = 0.42;
 
 export type MatchMode = "free-for-all" | "teams";
@@ -59,6 +60,7 @@ export type Plane = {
   shotsRemaining: number;
   reloadIn: number;
   rollFor: number;
+  rollCooldown: number;
   respawnIn: number;
   invulnerableFor: number;
   spawnIndex: number;
@@ -230,6 +232,7 @@ function makePlane(id: string, name: string, spawnIndex: number, team: Team | nu
     shotsRemaining: MAGAZINE_SIZE,
     reloadIn: 0,
     rollFor: 0,
+    rollCooldown: 0,
     respawnIn: 0,
     invulnerableFor: 2.2,
     spawnIndex,
@@ -349,6 +352,7 @@ export function stepGame(
     plane.fireCooldown = Math.max(0, plane.fireCooldown - safeDt);
     plane.specialCooldown = Math.max(0, plane.specialCooldown - safeDt);
     plane.rollFor = Math.max(0, plane.rollFor - safeDt);
+    plane.rollCooldown = Math.max(0, (plane.rollCooldown ?? 0) - safeDt);
     if (plane.reloadIn > 0) {
       plane.reloadIn = Math.max(0, plane.reloadIn - safeDt);
       if (plane.reloadIn === 0) plane.shotsRemaining = MAGAZINE_SIZE;
@@ -362,8 +366,9 @@ export function stepGame(
       plane.vy = Math.max(18, plane.vy);
     }
 
-    if (input.roll && plane.rollFor <= 0 && plane.invulnerableFor <= 0) {
+    if (input.roll && (plane.rollCooldown ?? 0) <= 0 && plane.invulnerableFor <= 0) {
       plane.rollFor = ROLL_DURATION;
+      plane.rollCooldown = ROLL_RECHARGE;
       pushEvent(state, "roll", plane.id);
     }
     if (
@@ -705,6 +710,7 @@ function destroyPlane(state: GameState, plane: Plane, targetId?: string) {
   plane.vy = 0;
   plane.bombs = 0;
   plane.rollFor = 0;
+  plane.rollCooldown = 0;
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== plane.id);
   pushEvent(state, "crash", plane.id, targetId);
 }
@@ -723,6 +729,7 @@ function respawnPlane(plane: Plane) {
   plane.shotsRemaining = MAGAZINE_SIZE;
   plane.reloadIn = 0;
   plane.rollFor = 0;
+  plane.rollCooldown = 0;
   plane.respawnIn = 0;
   plane.invulnerableFor = 2.2;
   plane.liftSide = spawn.liftSide;
