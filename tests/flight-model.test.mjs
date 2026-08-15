@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   addPlayer,
+  bombPowerUpPosition,
   createGame,
   groundY,
   planeSpeed,
@@ -160,6 +161,86 @@ test("team rooms balance automatic choices and prevent friendly fire", () => {
   stepGame(state, {}, 0);
   assert.equal(green.alive, false, "an opposing team could not be shot");
   assert.equal(redOne.score, 1);
+});
+
+test("bomb power-ups can be collected and dropped", () => {
+  const state = createGame("free-for-all", null, true);
+  const pilot = addPlayer(state, "pilot", "PILOT");
+  state.bombPowerUps = [{ id: state.nextPowerUpId++, cloudIndex: 0 }];
+  const pickup = bombPowerUpPosition(state, state.bombPowerUps[0]);
+  pilot.x = pickup.x;
+  pilot.y = pickup.y;
+
+  stepGame(state, {}, 0);
+  assert.equal(pilot.bombs, 1);
+  assert.equal(state.bombPowerUps.length, 0);
+  assert.ok(state.events.some((event) => event.type === "bomb-pickup"));
+
+  pilot.invulnerableFor = 0;
+  stepGame(state, { pilot: { turn: 0, fire: false, bomb: true } }, 0);
+  assert.equal(pilot.bombs, 0);
+  assert.equal(state.bombs.length, 1);
+  assert.ok(state.events.some((event) => event.type === "bomb-drop"));
+});
+
+test("one bomb blast can score several opponents", () => {
+  const state = createGame("free-for-all", null, true);
+  const owner = addPlayer(state, "owner", "OWNER");
+  const first = addPlayer(state, "first", "FIRST");
+  const second = addPlayer(state, "second", "SECOND");
+  owner.x = 500;
+  owner.y = 150;
+  first.x = 470;
+  first.y = 570;
+  second.x = 555;
+  second.y = 565;
+  owner.invulnerableFor = 0;
+  first.invulnerableFor = 0;
+  second.invulnerableFor = 0;
+  state.bombs.push({
+    id: state.nextBombId++,
+    ownerId: owner.id,
+    x: 510,
+    y: groundY(510) - 3,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+
+  stepGame(state, {}, 0);
+  assert.equal(first.alive, false);
+  assert.equal(second.alive, false);
+  assert.equal(owner.alive, true);
+  assert.equal(owner.score, 2);
+  assert.ok(state.events.some((event) => event.type === "bomb-explosion"));
+});
+
+test("bomb blasts preserve team protection", () => {
+  const state = createGame("teams", null, true);
+  const owner = addPlayer(state, "owner", "OWNER", 0);
+  const teammate = addPlayer(state, "teammate", "TEAMMATE", 0);
+  const opponent = addPlayer(state, "opponent", "OPPONENT", 1);
+  owner.x = 400;
+  owner.y = 150;
+  teammate.x = 430;
+  teammate.y = 570;
+  opponent.x = 485;
+  opponent.y = 570;
+  for (const plane of state.players) plane.invulnerableFor = 0;
+  state.bombs.push({
+    id: state.nextBombId++,
+    ownerId: owner.id,
+    x: 450,
+    y: groundY(450) - 3,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+
+  stepGame(state, {}, 0);
+  assert.equal(teammate.alive, true);
+  assert.equal(opponent.alive, false);
+  assert.equal(owner.score, 1);
 });
 
 test("a free-for-all ends when a pilot reaches the selected score", () => {

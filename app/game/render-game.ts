@@ -1,4 +1,6 @@
 import {
+  bombPowerUpPosition,
+  cloudPosition,
   groundY,
   planeSpeed,
   WORLD_HEIGHT,
@@ -8,7 +10,7 @@ import {
 } from "../../lib/game-core";
 import { wrapChatText } from "../../lib/chat";
 
-type Burst = { x: number; y: number; born: number; color: string };
+type Burst = { x: number; y: number; born: number; color: string; kind: "plane" | "bomb" };
 export type ChatBubble = { playerId: string; text: string; expiresAt: number };
 
 const bursts = new Map<number, Burst>();
@@ -38,7 +40,9 @@ export function renderGame(
 
   drawSky(context);
   drawClouds(context, state.time);
+  drawBombPowerUps(context, state);
   drawTerrain(context);
+  drawBombs(context, state);
   drawBullets(context, state);
   captureBursts(state, frameTime);
   drawBursts(context, frameTime);
@@ -54,9 +58,10 @@ function drawSky(context: CanvasRenderingContext2D) {
 }
 
 function drawClouds(context: CanvasRenderingContext2D, time: number) {
-  const drift = (time * 1.2) % (WORLD_WIDTH + 260);
-  drawPixelCloud(context, (155 + drift) % (WORLD_WIDTH + 260) - 130, 105, 1.2);
-  drawPixelCloud(context, (905 + drift * 0.72) % (WORLD_WIDTH + 260) - 130, 205, 1);
+  for (let index = 0; index < 2; index += 1) {
+    const cloud = cloudPosition(time, index);
+    drawPixelCloud(context, cloud.x, cloud.y, cloud.size);
+  }
 }
 
 function drawPixelCloud(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
@@ -93,6 +98,39 @@ function drawBullets(context: CanvasRenderingContext2D, state: GameState) {
   context.fillStyle = "#fffdf8";
   for (const bullet of state.bullets) {
     context.fillRect(Math.round(bullet.x) - 4, Math.round(bullet.y) - 2, 8, 4);
+  }
+}
+
+function drawBombPowerUps(context: CanvasRenderingContext2D, state: GameState) {
+  for (const powerUp of state.bombPowerUps) {
+    const position = bombPowerUpPosition(state, powerUp);
+    const flash = Math.floor(state.time * 4) % 2 === 0;
+    context.save();
+    context.translate(Math.round(position.x), Math.round(position.y));
+    context.fillStyle = flash ? "#f2a913" : "#17131f";
+    context.fillRect(-7, -9, 14, 13);
+    context.fillRect(-4, 4, 8, 6);
+    context.fillStyle = "#fffdf8";
+    context.fillRect(-3, -13, 6, 4);
+    context.font = gameFont(8);
+    context.textAlign = "center";
+    context.fillStyle = "#17131f";
+    context.fillText("BOMB", 0, 22);
+    context.restore();
+  }
+}
+
+function drawBombs(context: CanvasRenderingContext2D, state: GameState) {
+  for (const bomb of state.bombs) {
+    context.save();
+    context.translate(Math.round(bomb.x), Math.round(bomb.y));
+    context.rotate(Math.atan2(bomb.vy, bomb.vx) - Math.PI / 2);
+    context.fillStyle = "#17131f";
+    context.fillRect(-5, -7, 10, 14);
+    context.fillRect(-7, -9, 14, 4);
+    context.fillStyle = "#f2a913";
+    context.fillRect(-2, 7, 4, 5);
+    context.restore();
   }
 }
 
@@ -202,28 +240,56 @@ function captureBursts(state: GameState, frameTime: number) {
   for (const event of state.events) {
     if (event.id <= lastEventId) continue;
     lastEventId = Math.max(lastEventId, event.id);
-    if (event.type !== "crash") continue;
-    const plane = state.players.find((candidate) => candidate.id === event.playerId);
-    if (plane) bursts.set(event.id, { x: plane.x, y: plane.y, born: frameTime, color: plane.color });
+    if (event.type === "bomb-explosion" && event.x !== undefined && event.y !== undefined) {
+      bursts.set(event.id, {
+        x: event.x,
+        y: event.y,
+        born: frameTime,
+        color: "#f02b10",
+        kind: "bomb",
+      });
+      continue;
+    }
+    if (event.type === "crash") {
+      const plane = state.players.find((candidate) => candidate.id === event.playerId);
+      if (plane) {
+        bursts.set(event.id, {
+          x: plane.x,
+          y: plane.y,
+          born: frameTime,
+          color: plane.color,
+          kind: "plane",
+        });
+      }
+    }
   }
 }
 
 function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
   for (const [id, burst] of bursts) {
     const age = (frameTime - burst.born) / 1000;
-    if (age > 0.8) {
+    const duration = burst.kind === "bomb" ? 1 : 0.8;
+    if (age > duration) {
       bursts.delete(id);
       continue;
     }
-    const progress = age / 0.8;
+    const progress = age / duration;
     context.save();
     context.translate(burst.x, burst.y);
     context.globalAlpha = 1 - progress;
-    for (let index = 0; index < 8; index += 1) {
-      const angle = (index / 8) * Math.PI * 2;
-      const radius = 5 + progress * (18 + (index % 2) * 10);
-      context.fillStyle = index % 2 === 0 ? "#f2a913" : burst.color;
-      context.fillRect(Math.round(Math.cos(angle) * radius) - 4, Math.round(Math.sin(angle) * radius) - 4, 8, 8);
+    const count = burst.kind === "bomb" ? 16 : 8;
+    for (let index = 0; index < count; index += 1) {
+      const angle = (index / count) * Math.PI * 2;
+      const spread = burst.kind === "bomb" ? 108 : 18 + (index % 2) * 10;
+      const radius = 5 + progress * spread;
+      context.fillStyle = index % 3 === 0 ? "#17131f" : index % 2 === 0 ? "#f2a913" : burst.color;
+      const size = burst.kind === "bomb" ? 12 : 8;
+      context.fillRect(
+        Math.round(Math.cos(angle) * radius) - size / 2,
+        Math.round(Math.sin(angle) * radius) - size / 2,
+        size,
+        size,
+      );
     }
     context.restore();
   }
@@ -241,7 +307,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 export function pilotReadout(state: GameState, pilotId: string) {
   const plane = state.players.find((candidate) => candidate.id === pilotId);
   if (!plane) {
-    return { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0 };
+    return { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0, bombs: 0 };
   }
   return {
     speed: Math.round(planeSpeed(plane)),
@@ -250,5 +316,6 @@ export function pilotReadout(state: GameState, pilotId: string) {
     protected: plane.invulnerableFor > 0,
     alive: plane.alive,
     respawnIn: Math.max(0, plane.respawnIn),
+    bombs: plane.bombs,
   };
 }

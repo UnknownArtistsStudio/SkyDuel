@@ -3,6 +3,8 @@ export const WORLD_HEIGHT = 675;
 export const MAX_PLAYERS = 6;
 export const STALL_SPEED = 78;
 export const RECOVERY_SPEED = 102;
+export const BOMB_BLAST_RADIUS = 132;
+export const CLOUD_COUNT = 2;
 
 export type MatchMode = "free-for-all" | "teams";
 export type Team = 0 | 1;
@@ -22,10 +24,14 @@ const PLANE_RADIUS = 12;
 const BULLET_SPEED = 420;
 const BULLET_LIFE = 1.18;
 const FIRE_DELAY = 0.32;
+const BOMB_GRAVITY = 210;
+const BOMB_PICKUP_RADIUS = 28;
+const BOMB_LIFE = 8;
 
 export type PilotInput = {
   turn: -1 | 0 | 1;
   fire: boolean;
+  bomb: boolean;
 };
 
 export type Plane = {
@@ -47,6 +53,7 @@ export type Plane = {
   spawnIndex: number;
   liftSide: 1 | -1;
   team: Team | null;
+  bombs: number;
 };
 
 export type Bullet = {
@@ -59,23 +66,46 @@ export type Bullet = {
   life: number;
 };
 
+export type Bomb = {
+  id: number;
+  ownerId: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+};
+
+export type BombPowerUp = {
+  id: number;
+  cloudIndex: number;
+};
+
 export type GameEvent = {
   id: number;
-  type: "shot" | "crash" | "score" | "stall" | "recover";
+  type: "shot" | "crash" | "score" | "stall" | "recover" | "bomb-drop" | "bomb-explosion" | "bomb-pickup";
   playerId: string;
   targetId?: string;
+  x?: number;
+  y?: number;
   time: number;
 };
 
 export type GameState = {
   time: number;
   nextBulletId: number;
+  nextBombId: number;
+  nextPowerUpId: number;
   nextEventId: number;
   players: Plane[];
   bullets: Bullet[];
+  bombs: Bomb[];
+  bombPowerUps: BombPowerUp[];
+  bombSpawnIn: number;
   events: GameEvent[];
   matchMode: MatchMode;
   scoreLimit: ScoreLimit;
+  bombsEnabled: boolean;
   winner: GameWinner | null;
 };
 
@@ -94,16 +124,23 @@ const SPAWNS = [
 export function createGame(
   matchMode: MatchMode = "free-for-all",
   scoreLimit: ScoreLimit = 10,
+  bombsEnabled = false,
 ): GameState {
   return {
     time: 0,
     nextBulletId: 1,
+    nextBombId: 1,
+    nextPowerUpId: 1,
     nextEventId: 1,
     players: [],
     bullets: [],
+    bombs: [],
+    bombPowerUps: [],
+    bombSpawnIn: nextBombDelay(true),
     events: [],
     matchMode,
     scoreLimit,
+    bombsEnabled,
     winner: null,
   };
 }
@@ -126,6 +163,7 @@ export function addPlayer(
 export function removePlayer(state: GameState, id: string) {
   state.players = state.players.filter((player) => player.id !== id);
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== id);
+  state.bombs = state.bombs.filter((bomb) => bomb.ownerId !== id);
 }
 
 function makePlane(id: string, name: string, spawnIndex: number, team: Team | null): Plane {
@@ -149,6 +187,7 @@ function makePlane(id: string, name: string, spawnIndex: number, team: Team | nu
     spawnIndex,
     liftSide: spawn.liftSide,
     team,
+    bombs: 0,
   };
 }
 
@@ -174,6 +213,25 @@ export function planeSpeed(plane: Plane): number {
   return Math.hypot(plane.vx, plane.vy);
 }
 
+export function cloudPosition(time: number, cloudIndex: number) {
+  const index = Math.abs(Math.trunc(cloudIndex)) % CLOUD_COUNT;
+  const cloud = index === 0
+    ? { startX: 155, y: 105, speed: 1.2, size: 1.2, phase: 0 }
+    : { startX: 905, y: 205, speed: 0.86, size: 1, phase: 2.4 };
+  const span = WORLD_WIDTH + 260;
+  const x = (cloud.startX + time * cloud.speed) % span - 130;
+  const y = cloud.y + Math.round(Math.sin(time * 0.18 + cloud.phase) * 3);
+  return { x, y, size: cloud.size };
+}
+
+export function bombPowerUpPosition(state: GameState, powerUp: BombPowerUp) {
+  const cloud = cloudPosition(state.time, powerUp.cloudIndex);
+  return {
+    x: cloud.x + 40 * cloud.size,
+    y: cloud.y + 22 * cloud.size,
+  };
+}
+
 export function stepGame(
   state: GameState,
   inputs: Record<string, PilotInput>,
@@ -191,7 +249,7 @@ export function stepGame(
       continue;
     }
 
-    const input = inputs[plane.id] ?? { turn: 0, fire: false };
+    const input = inputs[plane.id] ?? { turn: 0, fire: false, bomb: false };
     const speed = planeSpeed(plane);
     const forwardX = Math.cos(plane.angle);
     const forwardY = Math.sin(plane.angle);
@@ -249,14 +307,22 @@ export function stepGame(
     }
 
     if (input.fire && plane.fireCooldown <= 0 && plane.invulnerableFor <= 0) fireBullet(state, plane);
+    if (input.bomb && plane.bombs > 0 && plane.invulnerableFor <= 0) dropBomb(state, plane);
 
     if (plane.y + PLANE_RADIUS >= groundY(plane.x)) {
       destroyPlane(state, plane, undefined);
     }
   }
 
+  updateBombPowerUps(state, safeDt);
+  updateBombs(state, safeDt);
   updateBullets(state, safeDt);
   if (!state.winner) updatePlaneCollisions(state);
+  if (state.winner) {
+    state.bullets = [];
+    state.bombs = [];
+    state.bombPowerUps = [];
+  }
 }
 
 function fireBullet(state: GameState, plane: Plane) {
@@ -273,6 +339,101 @@ function fireBullet(state: GameState, plane: Plane) {
     life: BULLET_LIFE,
   });
   pushEvent(state, "shot", plane.id);
+}
+
+function dropBomb(state: GameState, plane: Plane) {
+  plane.bombs -= 1;
+  state.bombs.push({
+    id: state.nextBombId++,
+    ownerId: plane.id,
+    x: plane.x,
+    y: plane.y + 13,
+    vx: plane.vx * 0.72,
+    vy: plane.vy + 35,
+    life: BOMB_LIFE,
+  });
+  pushEvent(state, "bomb-drop", plane.id, undefined, plane.x, plane.y);
+}
+
+function updateBombPowerUps(state: GameState, dt: number) {
+  if (!state.bombsEnabled) {
+    state.bombPowerUps = [];
+    return;
+  }
+
+  if (state.bombPowerUps.length === 0) {
+    state.bombSpawnIn -= dt;
+    if (state.bombSpawnIn <= 0) {
+      state.bombPowerUps.push({
+        id: state.nextPowerUpId++,
+        cloudIndex: Math.floor(Math.random() * CLOUD_COUNT),
+      });
+    }
+  }
+
+  for (const powerUp of state.bombPowerUps) {
+    const position = bombPowerUpPosition(state, powerUp);
+    const collector = state.players.find((plane) => {
+      if (!plane.alive || plane.bombs > 0) return false;
+      const dx = wrappedDistance(position.x, plane.x);
+      const dy = position.y - plane.y;
+      return dx * dx + dy * dy <= BOMB_PICKUP_RADIUS * BOMB_PICKUP_RADIUS;
+    });
+    if (!collector) continue;
+    collector.bombs = 1;
+    state.bombPowerUps = state.bombPowerUps.filter((candidate) => candidate.id !== powerUp.id);
+    state.bombSpawnIn = nextBombDelay(false);
+    pushEvent(state, "bomb-pickup", collector.id, undefined, position.x, position.y);
+    break;
+  }
+}
+
+function updateBombs(state: GameState, dt: number) {
+  const survivors: Bomb[] = [];
+  for (const bomb of state.bombs) {
+    bomb.vy += BOMB_GRAVITY * dt;
+    bomb.vx *= Math.pow(0.995, dt * 60);
+    bomb.x += bomb.vx * dt;
+    bomb.y += bomb.vy * dt;
+    bomb.life -= dt;
+    if (bomb.x < 0) bomb.x += WORLD_WIDTH;
+    if (bomb.x > WORLD_WIDTH) bomb.x -= WORLD_WIDTH;
+
+    const struckPlane = state.players.some((plane) => {
+      if (!plane.alive || plane.id === bomb.ownerId || plane.invulnerableFor > 0) return false;
+      const owner = state.players.find((candidate) => candidate.id === bomb.ownerId);
+      if (owner && areTeammates(state, owner, plane)) return false;
+      const dx = wrappedDistance(bomb.x, plane.x);
+      const dy = bomb.y - plane.y;
+      return dx * dx + dy * dy < 14 * 14;
+    });
+    if (struckPlane || bomb.y >= groundY(bomb.x) - 4 || bomb.life <= 0) {
+      explodeBomb(state, bomb);
+      continue;
+    }
+    survivors.push(bomb);
+  }
+  state.bombs = survivors;
+}
+
+function explodeBomb(state: GameState, bomb: Bomb) {
+  const owner = state.players.find((candidate) => candidate.id === bomb.ownerId);
+  let score = 0;
+  for (const plane of state.players) {
+    if (!plane.alive || plane.id === bomb.ownerId || plane.invulnerableFor > 0) continue;
+    if (owner && areTeammates(state, owner, plane)) continue;
+    const dx = wrappedDistance(bomb.x, plane.x);
+    const dy = bomb.y - plane.y;
+    if (dx * dx + dy * dy > BOMB_BLAST_RADIUS * BOMB_BLAST_RADIUS) continue;
+    destroyPlane(state, plane, bomb.ownerId);
+    pushEvent(state, "score", bomb.ownerId, plane.id);
+    score += 1;
+  }
+  if (owner && score > 0) {
+    owner.score += score;
+    checkWinner(state, owner);
+  }
+  pushEvent(state, "bomb-explosion", bomb.ownerId, undefined, bomb.x, bomb.y);
 }
 
 function updateBullets(state: GameState, dt: number) {
@@ -355,6 +516,7 @@ function destroyPlane(state: GameState, plane: Plane, targetId?: string) {
   plane.respawnIn = 2.75;
   plane.vx = 0;
   plane.vy = 0;
+  plane.bombs = 0;
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== plane.id);
   pushEvent(state, "crash", plane.id, targetId);
 }
@@ -372,12 +534,18 @@ function respawnPlane(plane: Plane) {
   plane.respawnIn = 0;
   plane.invulnerableFor = 2.2;
   plane.liftSide = spawn.liftSide;
+  plane.bombs = 0;
 }
 
 export function resetRound(state: GameState) {
   state.time = 0;
   state.nextBulletId = 1;
+  state.nextBombId = 1;
+  state.nextPowerUpId = 1;
   state.bullets = [];
+  state.bombs = [];
+  state.bombPowerUps = [];
+  state.bombSpawnIn = nextBombDelay(true);
   state.events = [];
   state.winner = null;
   for (const plane of state.players) {
@@ -392,13 +560,15 @@ function pushEvent(
   type: GameEvent["type"],
   playerId: string,
   targetId?: string,
+  x?: number,
+  y?: number,
 ) {
-  state.events.push({ id: state.nextEventId++, type, playerId, targetId, time: state.time });
+  state.events.push({ id: state.nextEventId++, type, playerId, targetId, x, y, time: state.time });
 }
 
 export function botInput(state: GameState, botId: string): PilotInput {
   const bot = state.players.find((player) => player.id === botId);
-  if (!bot || !bot.alive) return { turn: 0, fire: false };
+  if (!bot || !bot.alive) return { turn: 0, fire: false, bomb: false };
   const opponents = state.players.filter(
     (player) => player.id !== botId && player.alive && !areTeammates(state, bot, player),
   );
@@ -419,7 +589,17 @@ export function botInput(state: GameState, botId: string): PilotInput {
     ? Math.abs(angleDifference(Math.atan2(target.y - bot.y, wrappedDistance(target.x, bot.x)), bot.angle))
     : Math.PI;
   const fire = Boolean(target && targetDifference < 0.085 && distanceSquared(bot, target) < 380 * 380);
-  return { turn, fire };
+  const bomb = Boolean(
+    bot.bombs > 0 &&
+    target &&
+    target.y > bot.y + 45 &&
+    Math.abs(wrappedDistance(target.x, bot.x)) < 95
+  );
+  return { turn, fire, bomb };
+}
+
+function nextBombDelay(first: boolean) {
+  return (first ? 7 : 13) + Math.random() * (first ? 5 : 8);
 }
 
 function distanceSquared(a: Plane, b: Plane): number {
