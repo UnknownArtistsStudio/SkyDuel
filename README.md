@@ -7,10 +7,11 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 - Press **Start** on the pixel title screen to enable game audio and open the game menu.
 - **A / D** or **arrow keys** rotate the aircraft.
 - **Space** fires the forward gun.
-- Hold **T** and speak to send a short radio message above your aircraft. Press **Enter** for the typed fallback. Messages disappear after a few seconds and are not stored.
+- Hold **T** and speak to send a radio-filtered voice clip of up to three seconds plus a short message above your aircraft. Press **Enter** for the typed fallback. Clips and messages are transmitted directly to the room, disappear after playback, and are not stored.
+- When bomb pickups are enabled, fly through the bomb hidden in a drifting cloud, then press **B** to drop it. The blast can take out several opponents at once; the pilot who dropped it and teammates are safe from its blast.
 - A normal climb retains plenty of power; a prolonged steep climb still trades speed for altitude. If the aircraft stalls, point the nose down, allow speed to rebuild, then ease back into level flight.
 - A flashing respawn is completely protected: it cannot fire, be hit, or collide until the flashing ends.
-- On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. The controls stay at the screen edges and respect phone safe areas.
+- On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. A **Bomb** button appears only while carrying one. The controls stay at the screen edges and respect phone safe areas.
 
 ## Match types
 
@@ -19,6 +20,8 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 - **Private teams:** pilots request red, green, or automatic team assignment; friendly fire and friendly collisions are disabled.
 
 Private room creators choose first to 5, first to 10 (the default), first to 20, or no limit before opening the room. In free-for-all, the first pilot to the target wins. In teams, the red or green pilots' combined score decides the winner. The action freezes on the result screen and the lead pilot starts the next round.
+
+Room creators can also turn bomb pickups on or off. When enabled, one bomb power-up appears in a slowly drifting cloud at a time; another returns after the previous one is collected.
 
 Joining pilots can request a team, which is used only when the host selected team play. Both private modes support up to six pilots.
 

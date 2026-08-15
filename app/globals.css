@@ -683,6 +683,10 @@ strong {
     color: var(--orange);
   }
 
+  .bomb-button {
+    color: var(--white);
+  }
+
   .fire-button {
     color: var(--red);
   }

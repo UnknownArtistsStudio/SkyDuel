@@ -18,6 +18,13 @@ import {
   type TeamPreference,
 } from "../../lib/game-core";
 import { CHAT_MAX_LENGTH, cleanChatText } from "../../lib/chat";
+import {
+  VOICE_CLIP_SECONDS,
+  VOICE_COOLDOWN,
+  cleanVoiceClip,
+  preferredVoiceMimeType,
+  type VoiceClipPayload,
+} from "../../lib/radio";
 import { PeerRoom } from "./peer-room";
 import { pilotReadout, renderGame, type ChatBubble } from "./render-game";
 
@@ -29,8 +36,11 @@ type NetworkMessage =
   | { type: "welcome"; playerId: string; state: GameState }
   | { type: "snapshot"; state: GameState }
   | { type: "chat-request"; text: string }
-  | { type: "chat"; playerId: string; text: string };
+  | { type: "chat"; playerId: string; text: string }
+  | { type: "voice-request"; clip: VoiceClipPayload }
+  | { type: "voice"; playerId: string; clip: VoiceClipPayload };
 type EngineSound = { oscillator: OscillatorNode; gain: GainNode };
+type QueuedVoiceClip = VoiceClipPayload & { playerId: string; pilotName: string };
 type SpeechRecognitionAlternativeLike = { transcript: string };
 type SpeechRecognitionResultLike = {
   readonly length: number;
@@ -66,7 +76,7 @@ declare global {
   }
 }
 
-const neutralInput: PilotInput = { turn: 0, fire: false };
+const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false };
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
 
@@ -82,6 +92,16 @@ export function SkyDuel() {
   const engineSoundRef = useRef<EngineSound | null>(null);
   const chatBubblesRef = useRef<ChatBubble[]>([]);
   const chatRateRef = useRef(new Map<string, number>());
+  const voiceRateRef = useRef(new Map<string, number>());
+  const voiceQueueRef = useRef<QueuedVoiceClip[]>([]);
+  const voicePlayingRef = useRef(false);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceUrlRef = useRef("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const mediaStartedAtRef = useRef(0);
+  const voiceCapturePendingRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recognitionStoppingRef = useRef(false);
   const recognitionTimerRef = useRef<number | null>(null);
@@ -94,6 +114,7 @@ export function SkyDuel() {
   const [mode, setMode] = useState<Mode>(null);
   const [matchMode, setMatchMode] = useState<MatchMode>("free-for-all");
   const [scoreLimit, setScoreLimit] = useState<ScoreLimit>(10);
+  const [bombsEnabled, setBombsEnabled] = useState(false);
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
   const [callsign, setCallsign] = useState("ACE");
   const [joinCode, setJoinCode] = useState("");
@@ -104,11 +125,13 @@ export function SkyDuel() {
     readout: ReturnType<typeof pilotReadout>;
     pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null }>;
     scoreLimit: ScoreLimit;
+    bombsEnabled: boolean;
     winner: GameState["winner"];
   }>({
-    readout: { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0 },
+    readout: { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0, bombs: 0 },
     pilots: [],
     scoreLimit: 10,
+    bombsEnabled: false,
     winner: null,
   });
   const [copied, setCopied] = useState(false);
@@ -118,7 +141,21 @@ export function SkyDuel() {
   const [radioMessage, setRadioMessage] = useState("");
   const [lastChatLine, setLastChatLine] = useState("");
 
-  const { readout, pilots, scoreLimit: activeScoreLimit, winner } = hud;
+  const { readout, pilots, scoreLimit: activeScoreLimit, bombsEnabled: activeBombsEnabled, winner } = hud;
+
+  const flashRadio = useCallback((text: string, duration = 1800) => {
+    if (radioMessageTimerRef.current !== null) {
+      window.clearTimeout(radioMessageTimerRef.current);
+      radioMessageTimerRef.current = null;
+    }
+    setRadioMessage(text);
+    if (duration > 0) {
+      radioMessageTimerRef.current = window.setTimeout(() => {
+        setRadioMessage("");
+        radioMessageTimerRef.current = null;
+      }, duration);
+    }
+  }, []);
 
   const showChat = useCallback((playerId: string, value: unknown) => {
     const text = cleanChatText(value);
@@ -144,6 +181,29 @@ export function SkyDuel() {
     return text;
   }, [showChat]);
 
+  const acceptVoice = useCallback((playerId: string, value: unknown) => {
+    const now = performance.now();
+    const lastSentAt = voiceRateRef.current.get(playerId) ?? -VOICE_COOLDOWN;
+    if (now - lastSentAt < VOICE_COOLDOWN) return null;
+    const clip = cleanVoiceClip(value);
+    const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
+    if (!clip || !plane?.alive || gameRef.current.winner) return null;
+    voiceRateRef.current.set(playerId, now);
+    enqueueRadioClip(
+      clip,
+      playerId,
+      plane.name,
+      audioRef,
+      voiceQueueRef,
+      voicePlayingRef,
+      voiceAudioRef,
+      voiceUrlRef,
+      flashRadio,
+      isTalkingRef.current,
+    );
+    return clip;
+  }, [flashRadio]);
+
   const clearChat = useCallback(() => {
     if (radioMessageTimerRef.current !== null) {
       window.clearTimeout(radioMessageTimerRef.current);
@@ -151,6 +211,8 @@ export function SkyDuel() {
     }
     chatBubblesRef.current = [];
     chatRateRef.current.clear();
+    voiceRateRef.current.clear();
+    clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
     setChatDraft("");
     setChatInputOpen(false);
     setLastChatLine("");
@@ -180,6 +242,7 @@ export function SkyDuel() {
         delete remoteInputsRef.current[peerId];
         chatBubblesRef.current = chatBubblesRef.current.filter((bubble) => bubble.playerId !== peerId);
         chatRateRef.current.delete(peerId);
+        voiceRateRef.current.delete(peerId);
         setMessage("A pilot left the formation.");
       } else if (peerId === room.info.hostPeerId) {
         setError("The room closed when its lead pilot left.");
@@ -211,12 +274,19 @@ export function SkyDuel() {
           room.broadcast({ type: "chat", playerId: peerId, text } satisfies NetworkMessage);
         }
       }
+      if (role === "host" && incoming.type === "voice-request") {
+        const clip = acceptVoice(peerId, incoming.clip);
+        if (clip) {
+          room.broadcast({ type: "voice", playerId: peerId, clip } satisfies NetworkMessage);
+        }
+      }
       if (role === "guest" && incoming.type === "welcome") {
         localIdRef.current = incoming.playerId;
         gameRef.current = incoming.state;
         lastSoundEventRef.current = 0;
         setMatchMode(incoming.state.matchMode);
         setScoreLimit(incoming.state.scoreLimit);
+        setBombsEnabled(incoming.state.bombsEnabled);
         setMode("guest");
         setScreen("playing");
         setMessage("Connected. Watch your airspeed.");
@@ -231,8 +301,15 @@ export function SkyDuel() {
       ) {
         showChat(incoming.playerId, incoming.text);
       }
+      if (
+        role === "guest" &&
+        peerId === room.info.hostPeerId &&
+        incoming.type === "voice"
+      ) {
+        acceptVoice(incoming.playerId, incoming.clip);
+      }
     };
-  }, [acceptChat, showChat]);
+  }, [acceptChat, acceptVoice, showChat]);
 
   const pressStart = useCallback(() => {
     wakeAudio(audioRef, engineSoundRef);
@@ -242,7 +319,7 @@ export function SkyDuel() {
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame("free-for-all", scoreLimit);
+    const state = createGame("free-for-all", scoreLimit, bombsEnabled);
     const playerId = `pilot-${crypto.randomUUID()}`;
     addPlayer(state, playerId, cleanName(callsign));
     addPlayer(state, "practice-rival", "RIVAL");
@@ -258,7 +335,7 @@ export function SkyDuel() {
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [callsign, clearChat, scoreLimit]);
+  }, [bombsEnabled, callsign, clearChat, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -267,7 +344,7 @@ export function SkyDuel() {
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame(matchMode, scoreLimit);
+      const state = createGame(matchMode, scoreLimit, bombsEnabled);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
       clearChat();
@@ -284,7 +361,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [callsign, clearChat, matchMode, scoreLimit, setupRoom, teamPreference]);
+  }, [bombsEnabled, callsign, clearChat, matchMode, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -315,6 +392,13 @@ export function SkyDuel() {
     recognitionRef.current?.abort();
     recognitionRef.current = null;
     recognitionStoppingRef.current = false;
+    discardVoiceCapture(
+      mediaRecorderRef,
+      mediaStreamRef,
+      mediaChunksRef,
+      voiceCapturePendingRef,
+    );
+    clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     recognitionTimerRef.current = null;
     isTalkingRef.current = false;
@@ -342,20 +426,6 @@ export function SkyDuel() {
       roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
     }
   }, [clearChat, mode]);
-
-  const flashRadio = useCallback((text: string, duration = 1800) => {
-    if (radioMessageTimerRef.current !== null) {
-      window.clearTimeout(radioMessageTimerRef.current);
-      radioMessageTimerRef.current = null;
-    }
-    setRadioMessage(text);
-    if (duration > 0) {
-      radioMessageTimerRef.current = window.setTimeout(() => {
-        setRadioMessage("");
-        radioMessageTimerRef.current = null;
-      }, duration);
-    }
-  }, []);
 
   const openChatInput = useCallback(() => {
     setChatInputOpen(true);
@@ -385,36 +455,145 @@ export function SkyDuel() {
     }
   }, [acceptChat, flashRadio, mode]);
 
+  const sendVoiceClip = useCallback(async (blob: Blob, mimeType: string) => {
+    const playerId = localIdRef.current;
+    const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
+    if (!playerId || !plane?.alive || gameRef.current.winner || blob.size === 0) return;
+    const clip = cleanVoiceClip({ mimeType, data: await blobToBase64(blob) });
+    if (!clip) {
+      flashRadio("RADIO CLIP LOST");
+      return;
+    }
+    if (mode === "guest") {
+      roomRef.current?.sendToHost({ type: "voice-request", clip } satisfies NetworkMessage);
+    } else {
+      const accepted = acceptVoice(playerId, clip);
+      if (accepted && mode === "host") {
+        roomRef.current?.broadcast({ type: "voice", playerId, clip: accepted } satisfies NetworkMessage);
+      }
+    }
+    flashRadio("RADIO SENT");
+  }, [acceptVoice, flashRadio, mode]);
+
+  const stopVoiceCapture = useCallback(() => {
+    voiceCapturePendingRef.current = false;
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") {
+      recorder.stop();
+      return;
+    }
+    if (!recorder) {
+      stopMediaStream(mediaStreamRef);
+    }
+  }, []);
+
   const stopTalking = useCallback(() => {
     if (recognitionTimerRef.current !== null) {
       window.clearTimeout(recognitionTimerRef.current);
       recognitionTimerRef.current = null;
     }
+    isTalkingRef.current = false;
+    setIsTalking(false);
+    stopVoiceCapture();
+    window.setTimeout(() => {
+      drainRadioQueue(
+        audioRef,
+        voiceQueueRef,
+        voicePlayingRef,
+        voiceAudioRef,
+        voiceUrlRef,
+        flashRadio,
+      );
+    }, 100);
     const recognition = recognitionRef.current;
-    if (!recognition || recognitionStoppingRef.current) return;
-    recognitionStoppingRef.current = true;
-    try {
-      recognition.stop();
-    } catch {
-      recognition.abort();
+    if (recognition && !recognitionStoppingRef.current) {
+      recognitionStoppingRef.current = true;
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
     }
-  }, []);
+  }, [flashRadio, stopVoiceCapture]);
+
+  const startVoiceCapture = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") return;
+    voiceCapturePendingRef.current = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+        },
+      });
+      voiceCapturePendingRef.current = false;
+      if (!isTalkingRef.current) {
+        for (const track of stream.getTracks()) track.stop();
+        return;
+      }
+      const mimeType = preferredVoiceMimeType();
+      const recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 24_000,
+      });
+      mediaRecorderRef.current = recorder;
+      mediaStreamRef.current = stream;
+      mediaChunksRef.current = [];
+      mediaStartedAtRef.current = performance.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) mediaChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const duration = performance.now() - mediaStartedAtRef.current;
+        const chunks = mediaChunksRef.current;
+        mediaChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        stopMediaStream(mediaStreamRef);
+        if (duration >= 180 && chunks.length > 0) {
+          const clipType = mimeType || chunks[0].type || "audio/webm";
+          void sendVoiceClip(new Blob(chunks, { type: clipType }), clipType);
+        }
+      };
+      recorder.start();
+    } catch {
+      voiceCapturePendingRef.current = false;
+      mediaRecorderRef.current = null;
+      mediaChunksRef.current = [];
+      stopMediaStream(mediaStreamRef);
+      if (isTalkingRef.current) {
+        setChatInputOpen(true);
+        flashRadio("MIC BLOCKED / TYPE MESSAGE", 2600);
+      }
+    }
+  }, [flashRadio, sendVoiceClip]);
 
   const startTalking = useCallback(() => {
-    if (screen !== "playing" || recognitionRef.current) return;
+    if (screen !== "playing" || recognitionRef.current || mediaRecorderRef.current || voiceCapturePendingRef.current) return;
+    if (voicePlayingRef.current) {
+      flashRadio("RADIO BUSY");
+      return;
+    }
     const plane = gameRef.current.players.find((candidate) => candidate.id === localIdRef.current);
     if (!plane?.alive || gameRef.current.winner) {
       flashRadio("RADIO OFF WHILE DOWN");
       return;
     }
 
+    wakeAudio(audioRef, engineSoundRef);
+    isTalkingRef.current = true;
+    setIsTalking(true);
+    flashRadio("TRANSMITTING...", 0);
+    void startVoiceCapture();
+
     const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Recognition) {
-      openChatInput();
+      flashRadio("RECORDING / ENTER FOR TEXT", 0);
+      recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
       return;
     }
 
-    wakeAudio(audioRef, engineSoundRef);
     recognitionTranscriptRef.current = "";
     recognitionStoppingRef.current = false;
     let recognitionError = "";
@@ -443,6 +622,7 @@ export function SkyDuel() {
       }
       isTalkingRef.current = false;
       setIsTalking(false);
+      stopVoiceCapture();
       const transcript = recognitionTranscriptRef.current;
       recognitionTranscriptRef.current = "";
       if (transcript) {
@@ -451,26 +631,20 @@ export function SkyDuel() {
       } else if (recognitionError === "not-allowed" || recognitionError === "service-not-allowed") {
         setChatInputOpen(true);
         flashRadio("MIC BLOCKED / TYPE MESSAGE", 2600);
-      } else {
-        flashRadio("NO MESSAGE HEARD");
       }
     };
 
     recognitionRef.current = recognition;
-    isTalkingRef.current = true;
-    setIsTalking(true);
-    flashRadio("TRANSMITTING...", 0);
     try {
       recognition.start();
-      recognitionTimerRef.current = window.setTimeout(stopTalking, 5000);
+      recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
     } catch {
       recognitionRef.current = null;
       recognitionStoppingRef.current = false;
-      isTalkingRef.current = false;
-      setIsTalking(false);
-      openChatInput();
+      flashRadio("VOICE ONLY / ENTER FOR TEXT", 0);
+      recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
     }
-  }, [flashRadio, openChatInput, screen, sendChat, stopTalking]);
+  }, [flashRadio, screen, sendChat, startVoiceCapture, stopTalking, stopVoiceCapture]);
 
   const setArcadeTurn = useCallback((turn: -1 | 0 | 1) => {
     if (turn !== 0) void audioRef.current?.resume();
@@ -480,6 +654,11 @@ export function SkyDuel() {
   const setArcadeFire = useCallback((fire: boolean) => {
     if (fire) void audioRef.current?.resume();
     inputRef.current = { ...inputRef.current, fire };
+  }, []);
+
+  const dropArcadeBomb = useCallback(() => {
+    void audioRef.current?.resume();
+    inputRef.current = { ...inputRef.current, bomb: true };
   }, []);
 
   useEffect(() => {
@@ -494,6 +673,7 @@ export function SkyDuel() {
       inputRef.current = {
         turn: left === right ? 0 : left ? -1 : 1,
         fire: keys.has(" "),
+        bomb: inputRef.current.bomb,
       };
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -512,6 +692,11 @@ export function SkyDuel() {
       if (key === "enter" && screen === "playing") {
         event.preventDefault();
         openChatInput();
+        return;
+      }
+      if (key === "b" && screen === "playing") {
+        event.preventDefault();
+        if (!event.repeat) dropArcadeBomb();
         return;
       }
       if (["a", "d", "w", "s", "arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(key)) {
@@ -545,7 +730,7 @@ export function SkyDuel() {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [leaveGame, openChatInput, pressStart, screen, startTalking, stopTalking]);
+  }, [dropArcadeBomb, leaveGame, openChatInput, pressStart, screen, startTalking, stopTalking]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -567,17 +752,20 @@ export function SkyDuel() {
           [localIdRef.current]: inputRef.current,
           "practice-rival": botInput(state, "practice-rival"),
         }, dt);
+        inputRef.current = { ...inputRef.current, bomb: false };
       } else if (mode === "host") {
         stepGame(state, {
           ...remoteInputsRef.current,
           [localIdRef.current]: inputRef.current,
         }, dt);
+        inputRef.current = { ...inputRef.current, bomb: false };
         if (time - lastBroadcast > 66) {
           roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
           lastBroadcast = time;
         }
       } else if (mode === "guest" && time - lastBroadcast > 45) {
         roomRef.current?.sendToHost({ type: "input", input: inputRef.current } satisfies NetworkMessage);
+        inputRef.current = { ...inputRef.current, bomb: false };
         lastBroadcast = time;
       }
 
@@ -591,7 +779,7 @@ export function SkyDuel() {
         engineSoundRef.current,
         localPlane,
         screen === "playing" && !state.winner,
-        isTalkingRef.current,
+        isTalkingRef.current || voicePlayingRef.current,
       );
       playNewSounds(state, lastSoundEventRef, audioRef);
       if (canvasRef.current) {
@@ -604,6 +792,7 @@ export function SkyDuel() {
             .map(({ id, name, color, score, team }) => ({ id, name, color, score, team }))
             .sort((a, b) => b.score - a.score),
           scoreLimit: state.scoreLimit,
+          bombsEnabled: state.bombsEnabled,
           winner: state.winner,
         });
         lastHud = time;
@@ -617,6 +806,13 @@ export function SkyDuel() {
   useEffect(() => () => {
     recognitionRef.current?.abort();
     recognitionStoppingRef.current = false;
+    discardVoiceCapture(
+      mediaRecorderRef,
+      mediaStreamRef,
+      mediaChunksRef,
+      voiceCapturePendingRef,
+    );
+    clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     if (radioMessageTimerRef.current !== null) window.clearTimeout(radioMessageTimerRef.current);
     void roomRef.current?.close();
@@ -644,7 +840,7 @@ export function SkyDuel() {
         {screen === "playing" && (
           <>
             <div className="game-mode-label">
-              {modeLabel(mode)} / {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} / {limitLabel(activeScoreLimit)}
+              {modeLabel(mode)} / {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} / {limitLabel(activeScoreLimit)} / {activeBombsEnabled ? "BOMBS ON" : "GUNS ONLY"}
             </div>
             <div className="scoreboard" aria-label="Pilot scores">
               {matchMode === "teams" && mode !== "practice" && (
@@ -677,7 +873,9 @@ export function SkyDuel() {
                   ? "SAFE / GUNS OFF"
                   : readout.stalled
                     ? "STALL / NOSE DOWN"
-                    : "A D TURN / SPACE FIRE / T TALK"}
+                    : readout.bombs > 0
+                      ? "BOMB READY / B DROP"
+                      : "A D TURN / SPACE FIRE / T TALK"}
               </span>
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
@@ -742,8 +940,10 @@ export function SkyDuel() {
             <ArcadeControls
               disabled={!readout.alive || Boolean(winner)}
               isTalking={isTalking}
+              hasBomb={readout.bombs > 0}
               onTurn={setArcadeTurn}
               onFire={setArcadeFire}
+              onBomb={dropArcadeBomb}
               onTalkStart={startTalking}
               onTalkEnd={stopTalking}
             />
@@ -786,6 +986,15 @@ export function SkyDuel() {
                   </button>
                 </div>
                 <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
+                <div className="choice-group" role="group" aria-label="Bomb power-ups">
+                  <span>BOMB PICKUPS</span>
+                  <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
+                    OFF
+                  </button>
+                  <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
+                    ON
+                  </button>
+                </div>
                 {matchMode === "teams" && (
                   <TeamPicker value={teamPreference} onChange={setTeamPreference} />
                 )}
@@ -839,15 +1048,19 @@ export function SkyDuel() {
 function ArcadeControls({
   disabled,
   isTalking,
+  hasBomb,
   onTurn,
   onFire,
+  onBomb,
   onTalkStart,
   onTalkEnd,
 }: {
   disabled: boolean;
   isTalking: boolean;
+  hasBomb: boolean;
   onTurn: (turn: -1 | 0 | 1) => void;
   onFire: (fire: boolean) => void;
+  onBomb: () => void;
   onTalkStart: () => void;
   onTalkEnd: () => void;
 }) {
@@ -917,6 +1130,22 @@ function ArcadeControls({
         >
           TALK
         </button>
+        {hasBomb && (
+          <button
+            className="arcade-button bomb-button"
+            type="button"
+            disabled={disabled}
+            aria-label="Drop bomb"
+            onContextMenu={(event) => event.preventDefault()}
+            onPointerDown={(event) => {
+              if (disabled) return;
+              event.preventDefault();
+              onBomb();
+            }}
+          >
+            BOMB
+          </button>
+        )}
         <button
           className="arcade-button fire-button"
           type="button"
@@ -1021,6 +1250,7 @@ function sanitizeInput(input: PilotInput): PilotInput {
   return {
     turn: input?.turn === -1 || input?.turn === 1 ? input.turn : 0,
     fire: Boolean(input?.fire),
+    bomb: Boolean(input?.bomb),
   };
 }
 
@@ -1078,7 +1308,19 @@ function playNewSounds(
     if (event.type === "shot") pixelGunshot(context);
     if (event.type === "crash") pixelExplosion(context);
     if (event.type === "stall") tone(context, 120, 0.12, "triangle", 0.025);
+    if (event.type === "bomb-pickup") {
+      tone(context, 640, 0.08, "square", 0.04);
+      tone(context, 920, 0.12, "square", 0.025);
+    }
+    if (event.type === "bomb-drop") tone(context, 150, 0.13, "square", 0.035);
+    if (event.type === "bomb-explosion") pixelBombExplosion(context);
   }
+}
+
+function pixelBombExplosion(context: AudioContext) {
+  pixelExplosion(context);
+  tone(context, 58, 0.42, "square", 0.075);
+  window.setTimeout(() => pixelExplosion(context), 70);
 }
 
 function pixelExplosion(context: AudioContext) {
@@ -1138,4 +1380,150 @@ function tone(context: AudioContext, frequency: number, duration: number, type: 
   oscillator.connect(gain).connect(context.destination);
   oscillator.start();
   oscillator.stop(context.currentTime + duration);
+}
+
+async function blobToBase64(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return window.btoa(binary);
+}
+
+function base64ToBlob(data: string, mimeType: string) {
+  const binary = window.atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mimeType });
+}
+
+function enqueueRadioClip(
+  clip: VoiceClipPayload,
+  playerId: string,
+  pilotName: string,
+  audioRef: React.MutableRefObject<AudioContext | null>,
+  queueRef: React.MutableRefObject<QueuedVoiceClip[]>,
+  playingRef: React.MutableRefObject<boolean>,
+  audioElementRef: React.MutableRefObject<HTMLAudioElement | null>,
+  urlRef: React.MutableRefObject<string>,
+  announce: (text: string, duration?: number) => void,
+  pausePlayback: boolean,
+) {
+  if (queueRef.current.length >= 4) queueRef.current.shift();
+  queueRef.current.push({ ...clip, playerId, pilotName });
+  if (pausePlayback) return;
+  drainRadioQueue(audioRef, queueRef, playingRef, audioElementRef, urlRef, announce);
+}
+
+function drainRadioQueue(
+  audioRef: React.MutableRefObject<AudioContext | null>,
+  queueRef: React.MutableRefObject<QueuedVoiceClip[]>,
+  playingRef: React.MutableRefObject<boolean>,
+  audioElementRef: React.MutableRefObject<HTMLAudioElement | null>,
+  urlRef: React.MutableRefObject<string>,
+  announce: (text: string, duration?: number) => void,
+) {
+  if (playingRef.current) return;
+  const clip = queueRef.current.shift();
+  const context = audioRef.current;
+  if (!clip || !context) return;
+
+  playingRef.current = true;
+  const url = URL.createObjectURL(base64ToBlob(clip.data, clip.mimeType));
+  const audio = new Audio(url);
+  const source = context.createMediaElementSource(audio);
+  const highpass = context.createBiquadFilter();
+  const lowpass = context.createBiquadFilter();
+  const distortion = context.createWaveShaper();
+  const gain = context.createGain();
+  highpass.type = "highpass";
+  highpass.frequency.value = 360;
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 2_650;
+  distortion.curve = radioDistortionCurve();
+  distortion.oversample = "2x";
+  gain.gain.value = 0.72;
+  source.connect(highpass).connect(lowpass).connect(distortion).connect(gain).connect(context.destination);
+  audioElementRef.current = audio;
+  urlRef.current = url;
+  announce(`RADIO / ${clip.pilotName}`, 1800);
+  tone(context, 1_450, 0.045, "square", 0.025);
+  void context.resume();
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    audio.onended = null;
+    audio.onerror = null;
+    source.disconnect();
+    highpass.disconnect();
+    lowpass.disconnect();
+    distortion.disconnect();
+    gain.disconnect();
+    URL.revokeObjectURL(url);
+    if (audioElementRef.current === audio) audioElementRef.current = null;
+    if (urlRef.current === url) urlRef.current = "";
+    playingRef.current = false;
+    if (context.state !== "closed") tone(context, 760, 0.035, "square", 0.018);
+    window.setTimeout(
+      () => drainRadioQueue(audioRef, queueRef, playingRef, audioElementRef, urlRef, announce),
+      90,
+    );
+  };
+  audio.onended = finish;
+  audio.onerror = finish;
+  void audio.play().catch(finish);
+}
+
+function radioDistortionCurve() {
+  const curve = new Float32Array(256);
+  for (let index = 0; index < curve.length; index += 1) {
+    const x = (index * 2) / (curve.length - 1) - 1;
+    curve[index] = Math.tanh(x * 2.4) * 0.88;
+  }
+  return curve;
+}
+
+function clearVoicePlayback(
+  queueRef: React.MutableRefObject<QueuedVoiceClip[]>,
+  playingRef: React.MutableRefObject<boolean>,
+  audioElementRef: React.MutableRefObject<HTMLAudioElement | null>,
+  urlRef: React.MutableRefObject<string>,
+) {
+  queueRef.current = [];
+  const audio = audioElementRef.current;
+  if (audio) {
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+    audioElementRef.current = null;
+  }
+  if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+  urlRef.current = "";
+  playingRef.current = false;
+}
+
+function stopMediaStream(streamRef: React.MutableRefObject<MediaStream | null>) {
+  for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+  streamRef.current = null;
+}
+
+function discardVoiceCapture(
+  recorderRef: React.MutableRefObject<MediaRecorder | null>,
+  streamRef: React.MutableRefObject<MediaStream | null>,
+  chunksRef: React.MutableRefObject<Blob[]>,
+  pendingRef: React.MutableRefObject<boolean>,
+) {
+  pendingRef.current = false;
+  const recorder = recorderRef.current;
+  if (recorder) {
+    recorder.ondataavailable = null;
+    recorder.onstop = null;
+    if (recorder.state === "recording") recorder.stop();
+  }
+  recorderRef.current = null;
+  chunksRef.current = [];
+  stopMediaStream(streamRef);
 }
