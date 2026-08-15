@@ -168,6 +168,65 @@ strong {
   margin: 8px 0;
 }
 
+.face-editor-row {
+  display: grid;
+  grid-template-columns: 145px 80px auto auto;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0 18px;
+}
+
+.face-editor-row > span {
+  color: var(--white);
+  font-size: 8px;
+}
+
+.face-editor-row > button {
+  color: var(--white);
+  font-size: 7px;
+  text-align: left;
+}
+
+.face-editor-row > button:hover,
+.face-editor-row > button:focus-visible {
+  color: var(--orange);
+}
+
+.face-editor {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 80px;
+  height: 80px;
+  outline: 5px solid var(--black);
+  background: var(--white);
+  cursor: crosshair;
+  image-rendering: pixelated;
+  touch-action: none;
+  user-select: none;
+}
+
+.face-pixel,
+.portrait-pixel {
+  display: block;
+  background: var(--white);
+}
+
+.face-pixel.is-on,
+.portrait-pixel.is-on {
+  background: var(--black);
+}
+
+.pixel-portrait {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+  background: var(--pilot);
+  clip-path: polygon(25% 0, 75% 0, 75% 6%, 88% 6%, 88% 13%, 94% 13%, 94% 25%, 100% 25%, 100% 75%, 94% 75%, 94% 88%, 88% 88%, 88% 94%, 75% 94%, 75% 100%, 25% 100%, 25% 94%, 13% 94%, 13% 88%, 6% 88%, 6% 75%, 0 75%, 0 25%, 6% 25%, 6% 13%, 13% 13%, 13% 6%, 25% 6%);
+  image-rendering: pixelated;
+}
+
 .callsign-field span,
 .choice-group > span {
   color: var(--white);
@@ -427,6 +486,34 @@ strong {
   text-align: center;
 }
 
+.pilot-lineup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  gap: 18px;
+  align-items: end;
+  justify-content: center;
+  width: min(780px, 80%);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.lineup-pilot {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  color: var(--white);
+  font-size: 7px;
+}
+
+.winner-portraits {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 .leave-button {
   position: absolute;
   right: 13px;
@@ -502,6 +589,25 @@ strong {
   .callsign-field,
   .choice-group {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .face-editor-row {
+    grid-template-columns: 80px auto auto;
+  }
+
+  .face-editor-row > span {
+    grid-column: 1 / -1;
+  }
+
+  .pixel-portrait {
+    width: 54px;
+    height: 54px;
+    padding: 5px;
+  }
+
+  .pilot-lineup {
+    gap: 7px;
+    width: 92%;
   }
 
   .callsign-field span,

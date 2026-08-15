@@ -4,14 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addPlayer,
   botInput,
+  cleanFace,
   cleanName,
   createGame,
+  DEFAULT_FACE,
   MISSILE_DROP_TIME,
   removePlayer,
   resetRound,
   stepGame,
   type GameState,
+  type Landscape,
   type MatchMode,
+  type PlaneHits,
   type PilotInput,
   type Plane,
   type ScoreLimit,
@@ -32,7 +36,7 @@ import { pilotReadout, renderGame, resetRendererEffects, type ChatBubble } from 
 type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
 type NetworkMessage =
-  | { type: "hello"; name: string; teamPreference: TeamPreference }
+  | { type: "hello"; name: string; teamPreference: TeamPreference; face: string }
   | { type: "input"; input: PilotInput }
   | { type: "welcome"; playerId: string; state: GameState }
   | { type: "snapshot"; state: GameState }
@@ -41,7 +45,7 @@ type NetworkMessage =
   | { type: "voice-request"; clip: VoiceClipPayload }
   | { type: "voice"; playerId: string; clip: VoiceClipPayload };
 type EngineSound = { oscillator: OscillatorNode; gain: GainNode };
-type MusicMode = "silent" | "menu" | "game";
+type MusicMode = "silent" | "menu" | "game" | "action";
 type MusicSound = {
   master: GainNode | null;
   mode: MusicMode;
@@ -126,18 +130,23 @@ export function SkyDuel() {
   const [matchMode, setMatchMode] = useState<MatchMode>("free-for-all");
   const [scoreLimit, setScoreLimit] = useState<ScoreLimit>(10);
   const [bombsEnabled, setBombsEnabled] = useState(false);
+  const [revengeEnabled, setRevengeEnabled] = useState(true);
+  const [planeHits, setPlaneHits] = useState<PlaneHits>(1);
+  const [landscape, setLandscape] = useState<Landscape>("tower");
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
   const [callsign, setCallsign] = useState("ACE");
+  const [face, setFace] = useState(DEFAULT_FACE);
   const [joinCode, setJoinCode] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [message, setMessage] = useState("Engine on. First to 10 wins.");
   const [error, setError] = useState("");
   const [hud, setHud] = useState<{
     readout: ReturnType<typeof pilotReadout>;
-    pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null }>;
+    pilots: Array<{ id: string; name: string; color: string; score: number; team: Team | null; face: string; joinedAt: number }>;
     scoreLimit: ScoreLimit;
     bombsEnabled: boolean;
     winner: GameState["winner"];
+    matchTime: number;
   }>({
     readout: {
       speed: 0,
@@ -150,20 +159,30 @@ export function SkyDuel() {
       respawnIn: 0,
       bombs: 0,
       missiles: 0,
+      parachutes: 0,
       shotsRemaining: 0,
       reloadIn: 0,
+      onFoot: false,
+      parachuting: false,
+      damage: 0,
     },
     pilots: [],
     scoreLimit: 10,
     bombsEnabled: false,
     winner: null,
+    matchTime: 0,
   });
   const [copied, setCopied] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [radioMessage, setRadioMessage] = useState("");
   const [lastChatLine, setLastChatLine] = useState("");
 
-  const { readout, pilots, scoreLimit: activeScoreLimit, bombsEnabled: activeBombsEnabled, winner } = hud;
+  const { readout, pilots, scoreLimit: activeScoreLimit, bombsEnabled: activeBombsEnabled, winner, matchTime } = hud;
+  const winningPilots = winner
+    ? winner.kind === "pilot"
+      ? pilots.filter((pilot) => pilot.id === winner.playerId)
+      : pilots.filter((pilot) => pilot.team === winner.team)
+    : [];
 
   const flashRadio = useCallback((text: string, duration = 1800) => {
     if (radioMessageTimerRef.current !== null) {
@@ -209,12 +228,13 @@ export function SkyDuel() {
     if (now - lastSentAt < VOICE_COOLDOWN) return null;
     const clip = cleanVoiceClip(value);
     const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
-    if (!clip || !plane?.alive || gameRef.current.winner) return null;
+    const groundPilot = gameRef.current.groundPilots.some((pilot) => pilot.ownerId === playerId);
+    if (!clip || (!plane?.alive && !groundPilot) || gameRef.current.winner) return null;
     voiceRateRef.current.set(playerId, now);
     enqueueRadioClip(
       clip,
       playerId,
-      plane.name,
+      plane?.name ?? "PILOT",
       audioRef,
       voiceQueueRef,
       voicePlayingRef,
@@ -244,6 +264,7 @@ export function SkyDuel() {
     role: "host" | "guest",
     localName: string,
     requestedTeam: TeamPreference,
+    localFace: string,
   ) => {
     room.onStatus = (status) => setMessage(status);
     room.onPeerOpen = (peerId, name) => {
@@ -252,6 +273,7 @@ export function SkyDuel() {
           type: "hello",
           name: localName,
           teamPreference: requestedTeam,
+          face: localFace,
         } satisfies NetworkMessage);
       }
       if (role === "host") setMessage(`${cleanName(name ?? "PILOT")} IS JOINING...`);
@@ -277,7 +299,7 @@ export function SkyDuel() {
       if (!incoming || typeof incoming !== "object" || !("type" in incoming)) return;
       if (role === "host" && incoming.type === "hello") {
         if (!gameRef.current.players.some((player) => player.id === peerId)) {
-          addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference);
+          addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference, incoming.face);
         }
         room.sendTo(peerId, {
           type: "welcome",
@@ -309,6 +331,9 @@ export function SkyDuel() {
         setMatchMode(incoming.state.matchMode);
         setScoreLimit(incoming.state.scoreLimit);
         setBombsEnabled(incoming.state.bombsEnabled);
+        setRevengeEnabled(incoming.state.revengeEnabled ?? true);
+        setPlaneHits(incoming.state.planeHits ?? 1);
+        setLandscape(incoming.state.landscape ?? "tower");
         setMode("guest");
         setScreen("playing");
         setMessage("Connected. Watch your airspeed.");
@@ -347,9 +372,9 @@ export function SkyDuel() {
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame("free-for-all", scoreLimit, bombsEnabled);
+    const state = createGame("free-for-all", scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
     const playerId = `pilot-${crypto.randomUUID()}`;
-    addPlayer(state, playerId, cleanName(callsign));
+    addPlayer(state, playerId, cleanName(callsign), "auto", face);
     addPlayer(state, "practice-rival", "RIVAL");
     gameRef.current = state;
     resetRendererEffects();
@@ -364,7 +389,7 @@ export function SkyDuel() {
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [bombsEnabled, callsign, clearChat, scoreLimit]);
+  }, [bombsEnabled, callsign, clearChat, face, landscape, planeHits, revengeEnabled, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -373,8 +398,8 @@ export function SkyDuel() {
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame(matchMode, scoreLimit, bombsEnabled);
-      addPlayer(state, room.info.peerId, room.info.name, teamPreference);
+      const state = createGame(matchMode, scoreLimit, bombsEnabled, revengeEnabled, planeHits, landscape);
+      addPlayer(state, room.info.peerId, room.info.name, teamPreference, face);
       gameRef.current = state;
       resetRendererEffects();
       clearChat();
@@ -382,7 +407,7 @@ export function SkyDuel() {
       localIdRef.current = room.info.peerId;
       roomRef.current = room;
       remoteInputsRef.current = {};
-      setupRoom(room, "host", cleanName(callsign), teamPreference);
+      setupRoom(room, "host", cleanName(callsign), teamPreference, face);
       setMode("host");
       setRoomCode(room.info.code);
       setMessage("Room open. Share the four-letter code.");
@@ -391,7 +416,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [bombsEnabled, callsign, clearChat, matchMode, scoreLimit, setupRoom, teamPreference]);
+  }, [bombsEnabled, callsign, clearChat, face, landscape, matchMode, planeHits, revengeEnabled, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -408,7 +433,7 @@ export function SkyDuel() {
       const room = await PeerRoom.join(code, cleanName(callsign));
       roomRef.current = room;
       localIdRef.current = room.info.peerId;
-      setupRoom(room, "guest", cleanName(callsign), teamPreference);
+      setupRoom(room, "guest", cleanName(callsign), teamPreference, face);
       setRoomCode(room.info.code);
       setMode("guest");
       setMessage("CONNECTING TO THE LEAD PILOT...");
@@ -416,7 +441,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "That room could not be joined.");
       setScreen("join");
     }
-  }, [callsign, clearChat, joinCode, setupRoom, teamPreference]);
+  }, [callsign, clearChat, face, joinCode, setupRoom, teamPreference]);
 
   const leaveGame = useCallback(() => {
     recognitionRef.current?.abort();
@@ -462,8 +487,9 @@ export function SkyDuel() {
     const text = cleanChatText(value);
     const playerId = localIdRef.current;
     const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
+    const groundPilot = gameRef.current.groundPilots.some((pilot) => pilot.ownerId === playerId);
     if (!text || !playerId) return;
-    if (!plane?.alive || gameRef.current.winner) {
+    if ((!plane?.alive && !groundPilot) || gameRef.current.winner) {
       flashRadio("RADIO OFF WHILE DOWN");
       return;
     }
@@ -482,7 +508,8 @@ export function SkyDuel() {
   const sendVoiceClip = useCallback(async (blob: Blob, mimeType: string) => {
     const playerId = localIdRef.current;
     const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
-    if (!playerId || !plane?.alive || gameRef.current.winner || blob.size === 0) return;
+    const groundPilot = gameRef.current.groundPilots.some((pilot) => pilot.ownerId === playerId);
+    if (!playerId || (!plane?.alive && !groundPilot) || gameRef.current.winner || blob.size === 0) return;
     const clip = cleanVoiceClip({ mimeType, data: await blobToBase64(blob) });
     if (!clip) {
       flashRadio("RADIO CLIP LOST");
@@ -599,7 +626,8 @@ export function SkyDuel() {
       return;
     }
     const plane = gameRef.current.players.find((candidate) => candidate.id === localIdRef.current);
-    if (!plane?.alive || gameRef.current.winner) {
+    const groundPilot = gameRef.current.groundPilots.some((pilot) => pilot.ownerId === localIdRef.current);
+    if ((!plane?.alive && !groundPilot) || gameRef.current.winner) {
       flashRadio("RADIO OFF WHILE DOWN");
       return;
     }
@@ -795,7 +823,8 @@ export function SkyDuel() {
       }
 
       const localPlane = state.players.find((plane) => plane.id === localIdRef.current);
-      if (screen === "playing" && (!localPlane?.alive || state.winner)) {
+      const localGroundPilot = state.groundPilots.find((pilot) => pilot.ownerId === localIdRef.current);
+      if (screen === "playing" && ((!localPlane?.alive && !localGroundPilot) || state.winner)) {
         inputRef.current = { ...neutralInput };
         if (isTalkingRef.current) stopTalking();
       }
@@ -811,6 +840,7 @@ export function SkyDuel() {
         musicSoundRef.current,
         screen,
         isTalkingRef.current || voicePlayingRef.current,
+        state.groundPilots.length > 0 && !state.winner,
       );
       playNewSounds(state, lastSoundEventRef, audioRef);
       if (canvasRef.current) {
@@ -820,11 +850,12 @@ export function SkyDuel() {
         setHud({
           readout: pilotReadout(state, localIdRef.current),
           pilots: state.players
-            .map(({ id, name, color, score, team }) => ({ id, name, color, score, team }))
+            .map(({ id, name, color, score, team, face: pilotFace, joinedAt }) => ({ id, name, color, score, team, face: pilotFace ?? DEFAULT_FACE, joinedAt: joinedAt ?? 0 }))
             .sort((a, b) => b.score - a.score),
           scoreLimit: state.scoreLimit,
           bombsEnabled: state.bombsEnabled,
           winner: state.winner,
+          matchTime: state.time,
         });
         lastHud = time;
       }
@@ -872,7 +903,7 @@ export function SkyDuel() {
         {screen === "playing" && (
           <>
             <div className="game-mode-label">
-              {modeLabel(mode)} / {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} / {limitLabel(activeScoreLimit)} / {activeBombsEnabled ? "BOMBS ON" : "GUNS ONLY"}
+              {modeLabel(mode)} / {mode === "practice" ? "FREE FOR ALL" : matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"} / {limitLabel(activeScoreLimit)} / {landscape.toUpperCase()} / {planeHits} HIT / {activeBombsEnabled ? "BOMBS ON" : "GUNS ONLY"}
             </div>
             <div className="scoreboard" aria-label="Pilot scores">
               {matchMode === "teams" && mode !== "practice" && (
@@ -898,10 +929,25 @@ export function SkyDuel() {
               </button>
             )}
 
+            {!winner && pilots.some((pilot) => matchTime - pilot.joinedAt < 2.4) && pilots.length > 0 && (
+              <div className="pilot-lineup" aria-label="Pilots entering the match">
+                {pilots.map((pilot) => (
+                  <div className="lineup-pilot" key={pilot.id}>
+                    <PixelPortrait face={pilot.face} color={pilot.color} />
+                    <span>{pilot.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className={`flight-readout ${readout.stalled ? "is-stalled" : ""}`}>
               <span>SPEED <strong>{readout.speed}</strong></span>
               <span>
-                {readout.protected
+                {readout.onFoot
+                  ? readout.parachuting
+                    ? "PARACHUTE / FIRE"
+                    : "PILOT MG / FIRE"
+                  : readout.protected
                   ? "SAFE / GUNS OFF"
                   : readout.stalled
                     ? "STALL / NOSE DOWN"
@@ -909,6 +955,8 @@ export function SkyDuel() {
                       ? "BARREL ROLL"
                       : readout.rollCooldown > 0
                         ? `ROLL RESET ${readout.rollCooldown.toFixed(1)}`
+                        : readout.parachutes > 0
+                          ? "REVENGE READY"
                         : readout.missiles > 0
                           ? readout.missiles > 1
                             ? `MISSILES ${readout.missiles} / B FIRE`
@@ -938,6 +986,11 @@ export function SkyDuel() {
             {winner && (
               <div className="winner-card" role="status">
                 <span>WINNER</span>
+                <div className="winner-portraits">
+                  {winningPilots.map((pilot) => (
+                    <PixelPortrait key={pilot.id} face={pilot.face} color={pilot.color} />
+                  ))}
+                </div>
                 <strong>{winnerLabel(winner, pilots)}</strong>
                 {mode === "guest" ? (
                   <small>WAITING FOR LEAD PILOT</small>
@@ -952,7 +1005,7 @@ export function SkyDuel() {
             <ArcadeControls
               disabled={!readout.alive || Boolean(winner)}
               isTalking={isTalking}
-              specialWeapon={readout.missiles > 0 ? "MISSILE" : readout.bombs > 0 ? "BOMB" : null}
+              specialWeapon={readout.onFoot ? null : readout.missiles > 0 ? "MISSILE" : readout.bombs > 0 ? "BOMB" : null}
               onTurn={setArcadeTurn}
               onRoll={rollArcadePlane}
               onFire={setArcadeFire}
@@ -981,6 +1034,7 @@ export function SkyDuel() {
                     autoComplete="off"
                   />
                 </label>
+                <PixelFaceEditor value={face} onChange={setFace} />
                 <div className="choice-group" role="group" aria-label="Room rules">
                   <span>ROOM RULES</span>
                   <button
@@ -999,12 +1053,42 @@ export function SkyDuel() {
                   </button>
                 </div>
                 <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
+                <div className="choice-group" role="group" aria-label="Plane damage">
+                  <span>PLANE DAMAGE</span>
+                  <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
+                    1 HIT
+                  </button>
+                  <button type="button" aria-pressed={planeHits === 3} onClick={() => setPlaneHits(3)}>
+                    3 HITS
+                  </button>
+                </div>
+                <div className="choice-group" role="group" aria-label="Landscape">
+                  <span>LANDSCAPE</span>
+                  <button type="button" aria-pressed={landscape === "tower"} onClick={() => setLandscape("tower")}>
+                    TOWER
+                  </button>
+                  <button type="button" aria-pressed={landscape === "sea"} onClick={() => setLandscape("sea")}>
+                    SEA
+                  </button>
+                  <button type="button" aria-pressed={landscape === "mountains"} onClick={() => setLandscape("mountains")}>
+                    MOUNTAINS
+                  </button>
+                </div>
                 <div className="choice-group" role="group" aria-label="Bomb power-ups">
                   <span>BOMB PICKUPS</span>
                   <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
                     OFF
                   </button>
                   <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
+                    ON
+                  </button>
+                </div>
+                <div className="choice-group" role="group" aria-label="Revenge parachute">
+                  <span>REVENGE PILOT</span>
+                  <button type="button" aria-pressed={!revengeEnabled} onClick={() => setRevengeEnabled(false)}>
+                    OFF
+                  </button>
+                  <button type="button" aria-pressed={revengeEnabled} onClick={() => setRevengeEnabled(true)}>
                     ON
                   </button>
                 </div>
@@ -1019,6 +1103,13 @@ export function SkyDuel() {
                 </p>
                 <p className="menu-intro" aria-label="Missile reward rule">
                   MISSILES / EVERY 3 KILLS EARNS 1 / UNUSED MISSILES STACK
+                </p>
+                <p className="menu-intro" aria-label="Revenge parachute rule">
+                  REVENGE / AT 5 TOTAL KILLS A PARACHUTE APPEARS / COLLECT IT FOR ONE ARMED EJECTION<br />
+                  ON FOOT / LEFT + RIGHT MOVE / FIRE SHOOTS UP / 6 PILOT HITS = 1 PLANE HIT
+                </p>
+                <p className="menu-intro" aria-label="Three hit damage rule">
+                  3 HIT MODE / DAMAGED / SMOKE / EXPLODE
                 </p>
                 <div className="menu-actions">
                   <button type="button" onClick={beginPractice}>1 PRACTICE</button>
@@ -1064,6 +1155,79 @@ export function SkyDuel() {
         )}
       </section>
     </main>
+  );
+}
+
+function PixelFaceEditor({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (face: string) => void;
+}) {
+  const drawingRef = useRef<"0" | "1" | null>(null);
+  const workingFaceRef = useRef(cleanFace(value));
+  const pixels = cleanFace(value).split("");
+
+  useEffect(() => {
+    workingFaceRef.current = cleanFace(value);
+  }, [value]);
+
+  const paint = (event: React.PointerEvent<HTMLDivElement>, nextPixel?: "0" | "1") => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const column = Math.max(0, Math.min(7, Math.floor(((event.clientX - bounds.left) / bounds.width) * 8)));
+    const row = Math.max(0, Math.min(7, Math.floor(((event.clientY - bounds.top) / bounds.height) * 8)));
+    const index = row * 8 + column;
+    const pixel = nextPixel ?? drawingRef.current;
+    const workingPixels = workingFaceRef.current.split("");
+    if (!pixel || workingPixels[index] === pixel) return;
+    const next = [...workingPixels];
+    next[index] = pixel;
+    workingFaceRef.current = next.join("");
+    onChange(workingFaceRef.current);
+  };
+
+  return (
+    <div className="face-editor-row">
+      <span>PIXEL PILOT</span>
+      <div
+        className="face-editor"
+        role="img"
+        aria-label="Draw your pilot face with pixels"
+        onContextMenu={(event) => event.preventDefault()}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const column = Math.max(0, Math.min(7, Math.floor(((event.clientX - bounds.left) / bounds.width) * 8)));
+          const row = Math.max(0, Math.min(7, Math.floor(((event.clientY - bounds.top) / bounds.height) * 8)));
+          drawingRef.current = workingFaceRef.current[row * 8 + column] === "1" ? "0" : "1";
+          event.currentTarget.setPointerCapture(event.pointerId);
+          paint(event, drawingRef.current);
+        }}
+        onPointerMove={(event) => {
+          if (drawingRef.current) paint(event);
+        }}
+        onPointerUp={() => { drawingRef.current = null; }}
+        onPointerCancel={() => { drawingRef.current = null; }}
+        onLostPointerCapture={() => { drawingRef.current = null; }}
+      >
+        {pixels.map((pixel, index) => (
+          <span className={pixel === "1" ? "face-pixel is-on" : "face-pixel"} key={index} />
+        ))}
+      </div>
+      <button type="button" onClick={() => onChange("0".repeat(64))}>CLEAR</button>
+      <button type="button" onClick={() => onChange(DEFAULT_FACE)}>RESET</button>
+    </div>
+  );
+}
+
+function PixelPortrait({ face, color }: { face: string; color: string }) {
+  return (
+    <div className="pixel-portrait" style={{ "--pilot": color } as React.CSSProperties} aria-hidden="true">
+      {cleanFace(face).split("").map((pixel, index) => (
+        <span className={pixel === "1" ? "portrait-pixel is-on" : "portrait-pixel"} key={index} />
+      ))}
+    </div>
   );
 }
 
@@ -1332,6 +1496,7 @@ function updateMusic(
   music: MusicSound,
   screen: Screen,
   ducked: boolean,
+  action: boolean,
 ) {
   if (!context) return;
   if (!music.master) {
@@ -1340,22 +1505,36 @@ function updateMusic(
     music.master.connect(context.destination);
   }
 
-  const nextMode: MusicMode = screen === "playing" ? "game" : "menu";
+  const nextMode: MusicMode = screen === "playing" ? action ? "action" : "game" : "menu";
   if (music.mode !== nextMode) {
     music.mode = nextMode;
     music.step = 0;
     music.nextBeatAt = context.currentTime + 0.04;
   }
-  const fullVolume = nextMode === "menu" ? 0.32 : 0.13;
+  const fullVolume = nextMode === "menu" ? 0.32 : nextMode === "action" ? 0.17 : 0.13;
   music.master.gain.setTargetAtTime(ducked ? 0.018 : fullVolume, context.currentTime, 0.16);
 
-  const beatLength = nextMode === "menu" ? 0.72 : 0.9;
+  const beatLength = nextMode === "menu" ? 0.72 : nextMode === "action" ? 0.24 : 0.9;
   while (music.nextBeatAt < context.currentTime + 0.3) {
     if (nextMode === "menu") scheduleMenuBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
+    else if (nextMode === "action") scheduleActionBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
     else scheduleGameBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
     music.step = (music.step + 1) % 16;
     music.nextBeatAt += beatLength;
   }
+}
+
+function scheduleActionBeat(
+  context: AudioContext,
+  destination: AudioNode,
+  step: number,
+  start: number,
+  beat: number,
+) {
+  const notes = [110, 146.83, 164.81, 196, 164.81, 146.83, 123.47, 164.81];
+  scheduleMusicTone(context, destination, notes[step % notes.length], start, beat * 0.72, 0.017);
+  if (step % 4 === 0) scheduleMusicTone(context, destination, 55, start, beat * 1.5, 0.026);
+  if (step % 2 === 1) scheduleMusicTone(context, destination, 880, start, 0.025, 0.006);
 }
 
 function scheduleMenuBeat(
@@ -1465,7 +1644,8 @@ function playNewSounds(
     if (event.type === "reload") pixelReload(context);
     if (event.type === "roll") pixelRoll(context);
     if (event.type === "crash") pixelExplosion(context);
-    if (event.type === "score") {
+    if (event.type === "sea-crash") pixelSplash(context);
+    if (event.type === "score" && !state.winner) {
       const pilot = state.players.find((candidate) => candidate.id === event.playerId);
       heroicFanfare(context, pilot?.spawnIndex ?? 0);
     }
@@ -1478,7 +1658,32 @@ function playNewSounds(
     if (event.type === "missile-award") missileAwardFanfare(context);
     if (event.type === "missile-launch") pixelMissileLaunch(context);
     if (event.type === "missile-hit") pixelMissileHit(context);
+    if (event.type === "plane-hit") tone(context, 95, 0.1, "square", 0.028);
+    if (event.type === "revenge-spawn") revengeCue(context);
+    if (event.type === "revenge-pickup") suspenseFanfare(context);
+    if (event.type === "pilot-eject") sweptTone(context, 420, 150, 0.28, "square", 0.024);
+    if (event.type === "pilot-gun") tone(context, 520, 0.035, "square", 0.018);
+    if (event.type === "pilot-shot") pixelExplosion(context);
+    if (event.type === "pilot-bombed") pixelBombExplosion(context);
+    if (event.type === "pilot-vaporized") sweptTone(context, 940, 90, 0.32, "square", 0.04);
+    if (event.type === "victory") victoryFanfare(context);
   }
+}
+
+function revengeCue(context: AudioContext) {
+  const start = context.currentTime;
+  [110, 146.83, 110, 185, 220].forEach((frequency, index) => {
+    scheduleEffectTone(context, frequency, start + index * 0.11, index === 4 ? 0.32 : 0.1, 0.03);
+  });
+}
+
+function victoryFanfare(context: AudioContext) {
+  const start = context.currentTime;
+  const melody = [261.63, 329.63, 392, 523.25, 659.25, 783.99, 1046.5];
+  melody.forEach((frequency, index) => {
+    scheduleEffectTone(context, frequency, start + index * 0.13, index === melody.length - 1 ? 0.72 : 0.16, 0.045);
+    if (index >= 3) scheduleEffectTone(context, frequency * 0.75, start + index * 0.13, 0.2, 0.022);
+  });
 }
 
 function heroicFanfare(context: AudioContext, pilotIndex: number) {
@@ -1549,6 +1754,11 @@ function pixelBombExplosion(context: AudioContext) {
   pixelExplosion(context);
   tone(context, 58, 0.42, "square", 0.075);
   window.setTimeout(() => pixelExplosion(context), 70);
+}
+
+function pixelSplash(context: AudioContext) {
+  sweptTone(context, 180, 42, 0.38, "triangle", 0.04);
+  tone(context, 72, 0.22, "square", 0.022);
 }
 
 function pixelExplosion(context: AudioContext) {
