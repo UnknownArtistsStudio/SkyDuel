@@ -18,7 +18,7 @@ import {
   type Team,
   type TeamPreference,
 } from "../../lib/game-core";
-import { CHAT_MAX_LENGTH, cleanChatText } from "../../lib/chat";
+import { cleanChatText } from "../../lib/chat";
 import {
   VOICE_CLIP_SECONDS,
   VOICE_COOLDOWN,
@@ -120,7 +120,6 @@ export function SkyDuel() {
   const startPendingRef = useRef(false);
   const recognitionTranscriptRef = useRef("");
   const isTalkingRef = useRef(false);
-  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const [screen, setScreen] = useState<Screen>("title");
   const [mode, setMode] = useState<Mode>(null);
@@ -160,8 +159,6 @@ export function SkyDuel() {
     winner: null,
   });
   const [copied, setCopied] = useState(false);
-  const [chatDraft, setChatDraft] = useState("");
-  const [chatInputOpen, setChatInputOpen] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [radioMessage, setRadioMessage] = useState("");
   const [lastChatLine, setLastChatLine] = useState("");
@@ -238,8 +235,6 @@ export function SkyDuel() {
     chatRateRef.current.clear();
     voiceRateRef.current.clear();
     clearVoicePlayback(voiceQueueRef, voicePlayingRef, voiceAudioRef, voiceUrlRef);
-    setChatDraft("");
-    setChatInputOpen(false);
     setLastChatLine("");
     setRadioMessage("");
   }, []);
@@ -463,17 +458,10 @@ export function SkyDuel() {
     }
   }, [clearChat, mode]);
 
-  const openChatInput = useCallback(() => {
-    setChatInputOpen(true);
-    flashRadio("TYPE MESSAGE / ENTER SEND", 1500);
-  }, [flashRadio]);
-
   const sendChat = useCallback((value: unknown) => {
     const text = cleanChatText(value);
     const playerId = localIdRef.current;
     const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
-    setChatDraft("");
-    setChatInputOpen(false);
     if (!text || !playerId) return;
     if (!plane?.alive || gameRef.current.winner) {
       flashRadio("RADIO OFF WHILE DOWN");
@@ -599,8 +587,7 @@ export function SkyDuel() {
       mediaChunksRef.current = [];
       stopMediaStream(mediaStreamRef);
       if (isTalkingRef.current) {
-        setChatInputOpen(true);
-        flashRadio("MIC BLOCKED / TYPE MESSAGE", 2600);
+        flashRadio("MIC BLOCKED / ALLOW MIC", 2600);
       }
     }
   }, [flashRadio, sendVoiceClip]);
@@ -625,7 +612,7 @@ export function SkyDuel() {
 
     const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Recognition) {
-      flashRadio("RECORDING / ENTER FOR TEXT", 0);
+      flashRadio("RECORDING VOICE / 3 SEC MAX", 0);
       recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
       return;
     }
@@ -665,8 +652,7 @@ export function SkyDuel() {
         sendChat(transcript);
         flashRadio("MESSAGE SENT");
       } else if (recognitionError === "not-allowed" || recognitionError === "service-not-allowed") {
-        setChatInputOpen(true);
-        flashRadio("MIC BLOCKED / TYPE MESSAGE", 2600);
+        flashRadio("MIC BLOCKED / ALLOW MIC", 2600);
       }
     };
 
@@ -677,7 +663,7 @@ export function SkyDuel() {
     } catch {
       recognitionRef.current = null;
       recognitionStoppingRef.current = false;
-      flashRadio("VOICE ONLY / ENTER FOR TEXT", 0);
+      flashRadio("VOICE ONLY / 3 SEC MAX", 0);
       recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
     }
   }, [flashRadio, screen, sendChat, startVoiceCapture, stopTalking, stopVoiceCapture]);
@@ -701,10 +687,6 @@ export function SkyDuel() {
     void audioRef.current?.resume();
     inputRef.current = { ...inputRef.current, roll: true };
   }, []);
-
-  useEffect(() => {
-    if (chatInputOpen) chatInputRef.current?.focus();
-  }, [chatInputOpen]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -734,11 +716,6 @@ export function SkyDuel() {
       if (key === "t" && screen === "playing") {
         event.preventDefault();
         if (!event.repeat) startTalking();
-        return;
-      }
-      if (key === "enter" && screen === "playing") {
-        event.preventDefault();
-        openChatInput();
         return;
       }
       if (key === "b" && screen === "playing") {
@@ -778,7 +755,7 @@ export function SkyDuel() {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [dropArcadeBomb, leaveGame, openChatInput, pressStart, screen, startTalking, stopTalking]);
+  }, [dropArcadeBomb, leaveGame, pressStart, screen, startTalking, stopTalking]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -951,36 +928,6 @@ export function SkyDuel() {
               </div>
             )}
 
-            {chatInputOpen && (
-              <form
-                className="chat-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  sendChat(chatDraft);
-                }}
-              >
-                <label>
-                  <span>MESSAGE &gt;</span>
-                  <input
-                    ref={chatInputRef}
-                    value={chatDraft}
-                    maxLength={CHAT_MAX_LENGTH}
-                    autoComplete="off"
-                    aria-label="Message to the other pilots"
-                    onChange={(event) => setChatDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        event.preventDefault();
-                        setChatDraft("");
-                        setChatInputOpen(false);
-                      }
-                    }}
-                  />
-                </label>
-                <button type="submit">SEND</button>
-              </form>
-            )}
-
             {!winner && !readout.alive && (
               <div className="respawn-card">
                 <span>SHOT DOWN</span>
@@ -1067,8 +1014,11 @@ export function SkyDuel() {
                 <p className="menu-intro" aria-label="Radio chat instructions">
                   RADIO CHAT / ALLOW MIC FIRST TIME<br />
                   HOLD T + SPEAK / RELEASE TO SEND / 3 SEC MAX<br />
-                  PHONE: HOLD TALK / ENTER: TYPE MESSAGE<br />
+                  PHONE: HOLD TALK<br />
                   FRIENDS HEAR RADIO VOICE / WORDS APPEAR WHEN SUPPORTED / NOT STORED
+                </p>
+                <p className="menu-intro" aria-label="Missile reward rule">
+                  MISSILES / EVERY 3 KILLS EARNS 1 / UNUSED MISSILES STACK
                 </p>
                 <div className="menu-actions">
                   <button type="button" onClick={beginPractice}>1 PRACTICE</button>
