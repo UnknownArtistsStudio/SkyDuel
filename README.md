@@ -6,10 +6,11 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 
 - Press **Start** on the pixel title screen to enable game audio and open the game menu.
 - **A / D** or **arrow keys** rotate the aircraft.
-- **Space** or **Enter** fires the forward gun.
+- **Space** fires the forward gun.
+- Hold **T** and speak to send a short radio message above your aircraft. Press **Enter** for the typed fallback. Messages disappear after a few seconds and are not stored.
 - A normal climb retains plenty of power; a prolonged steep climb still trades speed for altitude. If the aircraft stalls, point the nose down, allow speed to rebuild, then ease back into level flight.
 - A flashing respawn is completely protected: it cannot fire, be hit, or collide until the flashing ends.
-- The layout includes touch controls for phones and tablets.
+- On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. The controls stay at the screen edges and respect phone safe areas.
 
 ## Match types
 

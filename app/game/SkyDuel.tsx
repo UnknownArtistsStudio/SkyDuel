@@ -17,8 +17,9 @@ import {
   type Team,
   type TeamPreference,
 } from "../../lib/game-core";
+import { CHAT_MAX_LENGTH, cleanChatText } from "../../lib/chat";
 import { PeerRoom } from "./peer-room";
-import { pilotReadout, renderGame } from "./render-game";
+import { pilotReadout, renderGame, type ChatBubble } from "./render-game";
 
 type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
@@ -26,10 +27,48 @@ type NetworkMessage =
   | { type: "hello"; name: string; teamPreference: TeamPreference }
   | { type: "input"; input: PilotInput }
   | { type: "welcome"; playerId: string; state: GameState }
-  | { type: "snapshot"; state: GameState };
+  | { type: "snapshot"; state: GameState }
+  | { type: "chat-request"; text: string }
+  | { type: "chat"; playerId: string; text: string };
 type EngineSound = { oscillator: OscillatorNode; gain: GainNode };
+type SpeechRecognitionAlternativeLike = { transcript: string };
+type SpeechRecognitionResultLike = {
+  readonly length: number;
+  readonly isFinal: boolean;
+  readonly [index: number]: SpeechRecognitionAlternativeLike;
+};
+type SpeechRecognitionEventLike = Event & {
+  readonly resultIndex: number;
+  readonly results: {
+    readonly length: number;
+    readonly [index: number]: SpeechRecognitionResultLike;
+  };
+};
+type SpeechRecognitionErrorEventLike = Event & { readonly error: string };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+};
+type SpeechRecognitionConstructorLike = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructorLike;
+    webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
+  }
+}
 
 const neutralInput: PilotInput = { turn: 0, fire: false };
+const CHAT_DURATION = 4600;
+const CHAT_COOLDOWN = 900;
 
 export function SkyDuel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,6 +80,15 @@ export function SkyDuel() {
   const lastSoundEventRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
   const engineSoundRef = useRef<EngineSound | null>(null);
+  const chatBubblesRef = useRef<ChatBubble[]>([]);
+  const chatRateRef = useRef(new Map<string, number>());
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const recognitionStoppingRef = useRef(false);
+  const recognitionTimerRef = useRef<number | null>(null);
+  const radioMessageTimerRef = useRef<number | null>(null);
+  const recognitionTranscriptRef = useRef("");
+  const isTalkingRef = useRef(false);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const [screen, setScreen] = useState<Screen>("title");
   const [mode, setMode] = useState<Mode>(null);
@@ -64,8 +112,50 @@ export function SkyDuel() {
     winner: null,
   });
   const [copied, setCopied] = useState(false);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatInputOpen, setChatInputOpen] = useState(false);
+  const [isTalking, setIsTalking] = useState(false);
+  const [radioMessage, setRadioMessage] = useState("");
+  const [lastChatLine, setLastChatLine] = useState("");
 
   const { readout, pilots, scoreLimit: activeScoreLimit, winner } = hud;
+
+  const showChat = useCallback((playerId: string, value: unknown) => {
+    const text = cleanChatText(value);
+    const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
+    if (!text || !plane) return "";
+    const now = performance.now();
+    chatBubblesRef.current = [
+      ...chatBubblesRef.current.filter(
+        (bubble) => bubble.playerId !== playerId && bubble.expiresAt > now,
+      ),
+      { playerId, text, expiresAt: now + CHAT_DURATION },
+    ];
+    setLastChatLine(`${plane.name}: ${text}`);
+    return text;
+  }, []);
+
+  const acceptChat = useCallback((playerId: string, value: unknown) => {
+    const now = performance.now();
+    const lastSentAt = chatRateRef.current.get(playerId) ?? -CHAT_COOLDOWN;
+    if (now - lastSentAt < CHAT_COOLDOWN) return "";
+    const text = showChat(playerId, value);
+    if (text) chatRateRef.current.set(playerId, now);
+    return text;
+  }, [showChat]);
+
+  const clearChat = useCallback(() => {
+    if (radioMessageTimerRef.current !== null) {
+      window.clearTimeout(radioMessageTimerRef.current);
+      radioMessageTimerRef.current = null;
+    }
+    chatBubblesRef.current = [];
+    chatRateRef.current.clear();
+    setChatDraft("");
+    setChatInputOpen(false);
+    setLastChatLine("");
+    setRadioMessage("");
+  }, []);
 
   const setupRoom = useCallback((
     room: PeerRoom,
@@ -88,6 +178,8 @@ export function SkyDuel() {
       if (role === "host") {
         removePlayer(gameRef.current, peerId);
         delete remoteInputsRef.current[peerId];
+        chatBubblesRef.current = chatBubblesRef.current.filter((bubble) => bubble.playerId !== peerId);
+        chatRateRef.current.delete(peerId);
         setMessage("A pilot left the formation.");
       } else if (peerId === room.info.hostPeerId) {
         setError("The room closed when its lead pilot left.");
@@ -113,6 +205,12 @@ export function SkyDuel() {
       if (role === "host" && incoming.type === "input") {
         remoteInputsRef.current[peerId] = sanitizeInput(incoming.input);
       }
+      if (role === "host" && incoming.type === "chat-request") {
+        const text = acceptChat(peerId, incoming.text);
+        if (text) {
+          room.broadcast({ type: "chat", playerId: peerId, text } satisfies NetworkMessage);
+        }
+      }
       if (role === "guest" && incoming.type === "welcome") {
         localIdRef.current = incoming.playerId;
         gameRef.current = incoming.state;
@@ -126,8 +224,15 @@ export function SkyDuel() {
       if (role === "guest" && incoming.type === "snapshot") {
         gameRef.current = incoming.state;
       }
+      if (
+        role === "guest" &&
+        peerId === room.info.hostPeerId &&
+        incoming.type === "chat"
+      ) {
+        showChat(incoming.playerId, incoming.text);
+      }
     };
-  }, []);
+  }, [acceptChat, showChat]);
 
   const pressStart = useCallback(() => {
     wakeAudio(audioRef, engineSoundRef);
@@ -142,6 +247,7 @@ export function SkyDuel() {
     addPlayer(state, playerId, cleanName(callsign));
     addPlayer(state, "practice-rival", "RIVAL");
     gameRef.current = state;
+    clearChat();
     lastSoundEventRef.current = 0;
     localIdRef.current = playerId;
     remoteInputsRef.current = {};
@@ -152,7 +258,7 @@ export function SkyDuel() {
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [callsign, scoreLimit]);
+  }, [callsign, clearChat, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -164,6 +270,7 @@ export function SkyDuel() {
       const state = createGame(matchMode, scoreLimit);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
+      clearChat();
       lastSoundEventRef.current = 0;
       localIdRef.current = room.info.peerId;
       roomRef.current = room;
@@ -177,7 +284,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [callsign, matchMode, scoreLimit, setupRoom, teamPreference]);
+  }, [callsign, clearChat, matchMode, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -188,6 +295,7 @@ export function SkyDuel() {
     setError("");
     setMessage("LOOKING FOR THAT FORMATION...");
     setScreen("connecting");
+    clearChat();
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.join(code, cleanName(callsign));
@@ -201,9 +309,16 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "That room could not be joined.");
       setScreen("join");
     }
-  }, [callsign, joinCode, setupRoom, teamPreference]);
+  }, [callsign, clearChat, joinCode, setupRoom, teamPreference]);
 
   const leaveGame = useCallback(() => {
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    recognitionStoppingRef.current = false;
+    if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
+    recognitionTimerRef.current = null;
+    isTalkingRef.current = false;
+    setIsTalking(false);
     void roomRef.current?.close();
     roomRef.current = null;
     gameRef.current = makeAttractGame();
@@ -211,20 +326,164 @@ export function SkyDuel() {
     localIdRef.current = "";
     inputRef.current = { ...neutralInput };
     remoteInputsRef.current = {};
+    clearChat();
     setMode(null);
     setRoomCode("");
     setMessage("Engine on. First to 10 wins.");
     setScreen("menu");
-  }, []);
+  }, [clearChat]);
 
   const restartRound = useCallback(() => {
     const state = gameRef.current;
     resetRound(state);
+    clearChat();
     setMessage("New round. Clear skies.");
     if (mode === "host") {
       roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
     }
-  }, [mode]);
+  }, [clearChat, mode]);
+
+  const flashRadio = useCallback((text: string, duration = 1800) => {
+    if (radioMessageTimerRef.current !== null) {
+      window.clearTimeout(radioMessageTimerRef.current);
+      radioMessageTimerRef.current = null;
+    }
+    setRadioMessage(text);
+    if (duration > 0) {
+      radioMessageTimerRef.current = window.setTimeout(() => {
+        setRadioMessage("");
+        radioMessageTimerRef.current = null;
+      }, duration);
+    }
+  }, []);
+
+  const openChatInput = useCallback(() => {
+    setChatInputOpen(true);
+    flashRadio("TYPE MESSAGE / ENTER SEND", 1500);
+  }, [flashRadio]);
+
+  const sendChat = useCallback((value: unknown) => {
+    const text = cleanChatText(value);
+    const playerId = localIdRef.current;
+    const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
+    setChatDraft("");
+    setChatInputOpen(false);
+    if (!text || !playerId) return;
+    if (!plane?.alive || gameRef.current.winner) {
+      flashRadio("RADIO OFF WHILE DOWN");
+      return;
+    }
+
+    if (mode === "guest") {
+      roomRef.current?.sendToHost({ type: "chat-request", text } satisfies NetworkMessage);
+      return;
+    }
+
+    const accepted = acceptChat(playerId, text);
+    if (accepted && mode === "host") {
+      roomRef.current?.broadcast({ type: "chat", playerId, text: accepted } satisfies NetworkMessage);
+    }
+  }, [acceptChat, flashRadio, mode]);
+
+  const stopTalking = useCallback(() => {
+    if (recognitionTimerRef.current !== null) {
+      window.clearTimeout(recognitionTimerRef.current);
+      recognitionTimerRef.current = null;
+    }
+    const recognition = recognitionRef.current;
+    if (!recognition || recognitionStoppingRef.current) return;
+    recognitionStoppingRef.current = true;
+    try {
+      recognition.stop();
+    } catch {
+      recognition.abort();
+    }
+  }, []);
+
+  const startTalking = useCallback(() => {
+    if (screen !== "playing" || recognitionRef.current) return;
+    const plane = gameRef.current.players.find((candidate) => candidate.id === localIdRef.current);
+    if (!plane?.alive || gameRef.current.winner) {
+      flashRadio("RADIO OFF WHILE DOWN");
+      return;
+    }
+
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) {
+      openChatInput();
+      return;
+    }
+
+    wakeAudio(audioRef, engineSoundRef);
+    recognitionTranscriptRef.current = "";
+    recognitionStoppingRef.current = false;
+    let recognitionError = "";
+    const recognition = new Recognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += `${event.results[index][0]?.transcript ?? ""} `;
+      }
+      recognitionTranscriptRef.current = cleanChatText(transcript);
+    };
+    recognition.onerror = (event) => {
+      recognitionError = event.error;
+    };
+    recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return;
+      recognitionRef.current = null;
+      recognitionStoppingRef.current = false;
+      if (recognitionTimerRef.current !== null) {
+        window.clearTimeout(recognitionTimerRef.current);
+        recognitionTimerRef.current = null;
+      }
+      isTalkingRef.current = false;
+      setIsTalking(false);
+      const transcript = recognitionTranscriptRef.current;
+      recognitionTranscriptRef.current = "";
+      if (transcript) {
+        sendChat(transcript);
+        flashRadio("MESSAGE SENT");
+      } else if (recognitionError === "not-allowed" || recognitionError === "service-not-allowed") {
+        flashRadio("MIC BLOCKED / ENTER TO TYPE", 2600);
+      } else {
+        flashRadio("NO MESSAGE HEARD");
+      }
+    };
+
+    recognitionRef.current = recognition;
+    isTalkingRef.current = true;
+    setIsTalking(true);
+    flashRadio("TRANSMITTING...", 0);
+    try {
+      recognition.start();
+      recognitionTimerRef.current = window.setTimeout(stopTalking, 5000);
+    } catch {
+      recognitionRef.current = null;
+      recognitionStoppingRef.current = false;
+      isTalkingRef.current = false;
+      setIsTalking(false);
+      openChatInput();
+    }
+  }, [flashRadio, openChatInput, screen, sendChat, stopTalking]);
+
+  const setArcadeTurn = useCallback((turn: -1 | 0 | 1) => {
+    if (turn !== 0) void audioRef.current?.resume();
+    inputRef.current = { ...inputRef.current, turn };
+  }, []);
+
+  const setArcadeFire = useCallback((fire: boolean) => {
+    if (fire) void audioRef.current?.resume();
+    inputRef.current = { ...inputRef.current, fire };
+  }, []);
+
+  useEffect(() => {
+    if (chatInputOpen) chatInputRef.current?.focus();
+  }, [chatInputOpen]);
 
   useEffect(() => {
     const keys = new Set<string>();
@@ -233,17 +492,28 @@ export function SkyDuel() {
       const right = ["d", "arrowright", "s", "arrowdown"].some((key) => keys.has(key));
       inputRef.current = {
         turn: left === right ? 0 : left ? -1 : 1,
-        fire: keys.has(" ") || keys.has("enter"),
+        fire: keys.has(" "),
       };
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       const key = event.key.toLowerCase();
       if (key === "enter" && screen === "title") {
         event.preventDefault();
         pressStart();
         return;
       }
-      if (["a", "d", "w", "s", "arrowleft", "arrowright", "arrowup", "arrowdown", " ", "enter"].includes(key)) {
+      if (key === "t" && screen === "playing") {
+        event.preventDefault();
+        if (!event.repeat) startTalking();
+        return;
+      }
+      if (key === "enter" && screen === "playing") {
+        event.preventDefault();
+        openChatInput();
+        return;
+      }
+      if (["a", "d", "w", "s", "arrowleft", "arrowright", "arrowup", "arrowdown", " "].includes(key)) {
         if (screen === "playing") event.preventDefault();
         if (screen === "playing") void audioRef.current?.resume();
         keys.add(key);
@@ -252,17 +522,29 @@ export function SkyDuel() {
       if (key === "escape" && screen === "playing") leaveGame();
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      keys.delete(event.key.toLowerCase());
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      const key = event.key.toLowerCase();
+      if (key === "t") {
+        stopTalking();
+        return;
+      }
+      keys.delete(key);
       refreshInput();
+    };
+    const onBlur = () => {
+      keys.clear();
+      refreshInput();
+      stopTalking();
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", () => keys.clear());
+    window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     };
-  }, [leaveGame, pressStart, screen]);
+  }, [leaveGame, openChatInput, pressStart, screen, startTalking, stopTalking]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -273,6 +555,7 @@ export function SkyDuel() {
       const dt = Math.min((time - previousTime) / 1000, 0.05);
       previousTime = time;
       const state = gameRef.current;
+      chatBubblesRef.current = chatBubblesRef.current.filter((bubble) => bubble.expiresAt > time);
 
       if (screen !== "playing") {
         const inputs: Record<string, PilotInput> = {};
@@ -298,14 +581,21 @@ export function SkyDuel() {
       }
 
       const localPlane = state.players.find((plane) => plane.id === localIdRef.current);
+      if (screen === "playing" && (!localPlane?.alive || state.winner)) {
+        inputRef.current = { ...neutralInput };
+        if (isTalkingRef.current) stopTalking();
+      }
       updateEngineSound(
         audioRef.current,
         engineSoundRef.current,
         localPlane,
         screen === "playing" && !state.winner,
+        isTalkingRef.current,
       );
       playNewSounds(state, lastSoundEventRef, audioRef);
-      if (canvasRef.current) renderGame(canvasRef.current, state, localIdRef.current, time);
+      if (canvasRef.current) {
+        renderGame(canvasRef.current, state, localIdRef.current, time, chatBubblesRef.current);
+      }
       if (time - lastHud > 100) {
         setHud({
           readout: pilotReadout(state, localIdRef.current),
@@ -321,20 +611,17 @@ export function SkyDuel() {
     };
     animationFrame = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(animationFrame);
-  }, [mode, screen]);
+  }, [mode, screen, stopTalking]);
 
   useEffect(() => () => {
+    recognitionRef.current?.abort();
+    recognitionStoppingRef.current = false;
+    if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
+    if (radioMessageTimerRef.current !== null) window.clearTimeout(radioMessageTimerRef.current);
     void roomRef.current?.close();
     engineSoundRef.current?.oscillator.stop();
     void audioRef.current?.close();
   }, []);
-
-  const touchControl = (field: "left" | "right" | "fire", pressed: boolean) => {
-    if (pressed) void audioRef.current?.resume();
-    if (field === "fire") inputRef.current = { ...inputRef.current, fire: pressed };
-    if (field === "left") inputRef.current = { ...inputRef.current, turn: pressed ? -1 : 0 };
-    if (field === "right") inputRef.current = { ...inputRef.current, turn: pressed ? 1 : 0 };
-  };
 
   const copyCode = async () => {
     await navigator.clipboard.writeText(roomCode);
@@ -385,10 +672,50 @@ export function SkyDuel() {
             <div className={`flight-readout ${readout.stalled ? "is-stalled" : ""}`}>
               <span>SPEED <strong>{readout.speed}</strong></span>
               <span>
-                {readout.protected ? "SAFE / GUNS OFF" : readout.stalled ? "STALL / NOSE DOWN" : "A D TURN / SPACE FIRE"}
+                {readout.protected
+                  ? "SAFE / GUNS OFF"
+                  : readout.stalled
+                    ? "STALL / NOSE DOWN"
+                    : "A D TURN / SPACE FIRE / T TALK"}
               </span>
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
+
+            {radioMessage && (
+              <div className={`radio-status ${isTalking ? "is-transmitting" : ""}`} role="status">
+                {radioMessage}
+              </div>
+            )}
+
+            {chatInputOpen && (
+              <form
+                className="chat-composer"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  sendChat(chatDraft);
+                }}
+              >
+                <label>
+                  <span>MESSAGE &gt;</span>
+                  <input
+                    ref={chatInputRef}
+                    value={chatDraft}
+                    maxLength={CHAT_MAX_LENGTH}
+                    autoComplete="off"
+                    aria-label="Message to the other pilots"
+                    onChange={(event) => setChatDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setChatDraft("");
+                        setChatInputOpen(false);
+                      }
+                    }}
+                  />
+                </label>
+                <button type="submit">SEND</button>
+              </form>
+            )}
 
             {!winner && !readout.alive && (
               <div className="respawn-card">
@@ -411,36 +738,16 @@ export function SkyDuel() {
 
             <button className="leave-button" type="button" onClick={leaveGame}>QUIT</button>
 
-            <div className="touch-controls" aria-label="Touch flight controls">
-              <button
-                type="button"
-                aria-label="Rotate left"
-                onPointerDown={() => touchControl("left", true)}
-                onPointerUp={() => touchControl("left", false)}
-                onPointerCancel={() => touchControl("left", false)}
-              >
-                LEFT
-              </button>
-              <button
-                className="touch-fire"
-                type="button"
-                aria-label="Fire"
-                onPointerDown={() => touchControl("fire", true)}
-                onPointerUp={() => touchControl("fire", false)}
-                onPointerCancel={() => touchControl("fire", false)}
-              >
-                FIRE
-              </button>
-              <button
-                type="button"
-                aria-label="Rotate right"
-                onPointerDown={() => touchControl("right", true)}
-                onPointerUp={() => touchControl("right", false)}
-                onPointerCancel={() => touchControl("right", false)}
-              >
-                RIGHT
-              </button>
-            </div>
+            <ArcadeControls
+              disabled={!readout.alive || Boolean(winner)}
+              isTalking={isTalking}
+              onTurn={setArcadeTurn}
+              onFire={setArcadeFire}
+              onTalkStart={startTalking}
+              onTalkEnd={stopTalking}
+            />
+
+            <span className="chat-announcer" aria-live="polite">{lastChatLine}</span>
           </>
         )}
 
@@ -525,6 +832,121 @@ export function SkyDuel() {
         )}
       </section>
     </main>
+  );
+}
+
+function ArcadeControls({
+  disabled,
+  isTalking,
+  onTurn,
+  onFire,
+  onTalkStart,
+  onTalkEnd,
+}: {
+  disabled: boolean;
+  isTalking: boolean;
+  onTurn: (turn: -1 | 0 | 1) => void;
+  onFire: (fire: boolean) => void;
+  onTalkStart: () => void;
+  onTalkEnd: () => void;
+}) {
+  const stickPointerRef = useRef<number | null>(null);
+  const [stickX, setStickX] = useState(0);
+  const [firing, setFiring] = useState(false);
+
+  const releaseStick = useCallback(() => {
+    stickPointerRef.current = null;
+    setStickX(0);
+    onTurn(0);
+  }, [onTurn]);
+
+  const moveStick = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (stickPointerRef.current !== event.pointerId) return;
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const travel = Math.min(28, bounds.width * 0.28);
+    const offset = Math.max(-travel, Math.min(travel, event.clientX - bounds.left - bounds.width / 2));
+    setStickX(offset);
+    onTurn(offset < -7 ? -1 : offset > 7 ? 1 : 0);
+  }, [onTurn]);
+
+  return (
+    <div className="arcade-controls" aria-label="Arcade flight controls">
+      <button
+        className="arcade-stick"
+        type="button"
+        disabled={disabled}
+        aria-label="Turn joystick"
+        style={{ "--stick-x": `${disabled ? 0 : stickX}px` } as React.CSSProperties}
+        onContextMenu={(event) => event.preventDefault()}
+        onPointerDown={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          stickPointerRef.current = event.pointerId;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          moveStick(event);
+        }}
+        onPointerMove={moveStick}
+        onPointerUp={releaseStick}
+        onPointerCancel={releaseStick}
+        onLostPointerCapture={releaseStick}
+      >
+        <span className="stick-rail" />
+        <span className="stick-knob" />
+        <span className="stick-label">TURN</span>
+      </button>
+
+      <div className="arcade-actions">
+        <button
+          className="arcade-button talk-button"
+          type="button"
+          disabled={disabled}
+          aria-label="Hold to talk"
+          aria-pressed={isTalking}
+          onContextMenu={(event) => event.preventDefault()}
+          onPointerDown={(event) => {
+            if (disabled) return;
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            onTalkStart();
+          }}
+          onPointerUp={onTalkEnd}
+          onPointerCancel={onTalkEnd}
+          onLostPointerCapture={onTalkEnd}
+        >
+          TALK
+        </button>
+        <button
+          className="arcade-button fire-button"
+          type="button"
+          disabled={disabled}
+          aria-label="Fire"
+          aria-pressed={firing && !disabled}
+          onContextMenu={(event) => event.preventDefault()}
+          onPointerDown={(event) => {
+            if (disabled) return;
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setFiring(true);
+            onFire(true);
+          }}
+          onPointerUp={() => {
+            setFiring(false);
+            onFire(false);
+          }}
+          onPointerCancel={() => {
+            setFiring(false);
+            onFire(false);
+          }}
+          onLostPointerCapture={() => {
+            setFiring(false);
+            onFire(false);
+          }}
+        >
+          FIRE
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -632,12 +1054,14 @@ function updateEngineSound(
   engine: EngineSound | null,
   plane: Plane | undefined,
   playing: boolean,
+  talking: boolean,
 ) {
   if (!context || !engine) return;
   const active = Boolean(playing && plane?.alive);
   const speed = plane ? Math.min(240, Math.hypot(plane.vx, plane.vy)) : 0;
   engine.oscillator.frequency.setTargetAtTime(44 + speed * 0.09, context.currentTime, 0.08);
-  engine.gain.gain.setTargetAtTime(active ? 0.0045 : 0.0001, context.currentTime, 0.06);
+  const activeVolume = talking ? 0.0007 : 0.0045;
+  engine.gain.gain.setTargetAtTime(active ? activeVolume : 0.0001, context.currentTime, 0.06);
 }
 
 function playNewSounds(
