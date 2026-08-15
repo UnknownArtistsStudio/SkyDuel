@@ -44,6 +44,7 @@ export type PilotInput = {
   fire: boolean;
   bomb: boolean;
   roll: boolean;
+  aimUp?: boolean;
 };
 
 export type Plane = {
@@ -118,7 +119,7 @@ export type GroundPilot = {
   falling: boolean;
   wreck: boolean;
   strandedFor: number;
-  aim: -1 | 0 | 1;
+  aim: -2 | -1 | 0 | 1 | 2;
   fireCooldown: number;
   invulnerableFor: number;
 };
@@ -676,7 +677,7 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
       : 0;
     if (pilot.x < 0) pilot.x += WORLD_WIDTH;
     if (pilot.x > WORLD_WIDTH) pilot.x -= WORLD_WIDTH;
-    if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot, input.turn);
+    if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot, input.turn, Boolean(input.aimUp));
   }
 
   const sinkingPilots = state.groundPilots.filter(
@@ -694,16 +695,22 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
   }
 }
 
-function firePilotGun(state: GameState, pilot: GroundPilot, turn: -1 | 0 | 1) {
+function firePilotGun(
+  state: GameState,
+  pilot: GroundPilot,
+  turn: -1 | 0 | 1,
+  aimUp: boolean,
+) {
   pilot.fireCooldown = 0.16;
-  pilot.aim = turn;
-  const horizontalSpeed = turn * 330;
-  const verticalSpeed = turn === 0 ? -325 : 0;
+  pilot.aim = turn === 0 ? 0 : aimUp ? turn : turn === -1 ? -2 : 2;
+  const diagonal = aimUp && turn !== 0;
+  const horizontalSpeed = turn * (diagonal ? 235 : 330);
+  const verticalSpeed = turn === 0 ? -325 : diagonal ? -235 : 0;
   state.pilotBullets.push({
     id: state.nextPilotBulletId++,
     ownerId: pilot.ownerId,
-    x: pilot.x + turn * 7,
-    y: pilot.y - (turn === 0 ? 10 : 4),
+    x: pilot.x + turn * (diagonal ? 5 : 7),
+    y: pilot.y - (turn === 0 ? 10 : diagonal ? 8 : 4),
     vx: horizontalSpeed,
     vy: verticalSpeed,
     life: 1.65,
@@ -1136,7 +1143,13 @@ export function botInput(state: GameState, botId: string): PilotInput {
     const target = state.players.find((candidate) => candidate.id !== botId && candidate.alive && !areTeammates(state, bot, candidate));
     if (!pilot || !target) return { turn: 0, fire: false, bomb: false, roll: false };
     const dx = wrappedDistance(target.x, pilot.x);
-    return { turn: Math.abs(dx) < 20 ? 0 : dx > 0 ? 1 : -1, fire: true, bomb: false, roll: false };
+    return {
+      turn: Math.abs(dx) < 20 ? 0 : dx > 0 ? 1 : -1,
+      fire: true,
+      bomb: false,
+      roll: false,
+      aimUp: target.y < pilot.y - 18,
+    };
   }
   const opponents = state.players.filter(
     (player) => player.id !== botId && player.alive && !areTeammates(state, bot, player),

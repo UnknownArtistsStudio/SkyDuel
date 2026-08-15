@@ -260,6 +260,15 @@ test("the five-kill revenge parachute creates an armed vulnerable pilot", () => 
   const angledShot = state.pilotBullets.at(-1);
   assert.ok(angledShot.vx > 300 && angledShot.vy === 0, "the pilot gun did not aim sideways");
 
+  state.groundPilots[0].fireCooldown = 0;
+  stepGame(state, { carrier: { turn: 1, fire: true, bomb: false, roll: false, aimUp: true } }, 0);
+  const diagonalShot = state.pilotBullets.at(-1);
+  assert.ok(
+    diagonalShot.vx > 200 && diagonalShot.vx < 300 && diagonalShot.vy < -200,
+    "the pilot gun did not aim diagonally",
+  );
+  assert.equal(state.groundPilots[0].aim, 1);
+
   const pilot = state.groundPilots[0];
   pilot.invulnerableFor = 0;
   state.bullets.push({
