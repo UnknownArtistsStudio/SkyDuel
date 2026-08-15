@@ -4,9 +4,13 @@ import test from "node:test";
 import {
   addPlayer,
   bombPowerUpPosition,
+  cleanFace,
+  cloudPosition,
   createGame,
+  DEFAULT_FACE,
   groundY,
   MISSILE_DROP_TIME,
+  planeInCloud,
   planeSpeed,
   resetRound,
   ROLL_RECHARGE,
@@ -188,6 +192,206 @@ test("barrel rolls require a short recharge before another dodge", () => {
   for (let frame = 0; frame < 28; frame += 1) stepGame(state, {}, 0.05);
   stepGame(state, { pilot: { turn: 0, fire: false, bomb: false, roll: true } }, 0);
   assert.ok(pilot.rollFor > 0, "the roll did not return after recharging");
+});
+
+test("three-hit mode shows two damage stages before a plane explodes", () => {
+  const state = createGame("free-for-all", null, false, true, 3);
+  const shooter = addPlayer(state, "shooter", "SHOOTER");
+  const target = addPlayer(state, "target", "TARGET");
+  shooter.invulnerableFor = 0;
+  target.invulnerableFor = 0;
+
+  for (let hit = 1; hit <= 3; hit += 1) {
+    state.bullets.push({
+      id: state.nextBulletId++,
+      ownerId: shooter.id,
+      x: target.x,
+      y: target.y,
+      vx: 0,
+      vy: 0,
+      life: 1,
+    });
+    stepGame(state, {}, 0);
+    assert.equal(target.damage, hit < 3 ? hit : 0);
+    assert.equal(target.alive, hit < 3);
+  }
+
+  assert.equal(shooter.score, 1);
+  assert.equal(state.events.filter((event) => event.type === "plane-hit").length, 2);
+});
+
+test("the five-kill revenge parachute creates an armed vulnerable pilot", () => {
+  const state = createGame("free-for-all", null, false, true, 1);
+  const carrier = addPlayer(state, "carrier", "CARRIER");
+  const attacker = addPlayer(state, "attacker", "ATTACKER");
+  carrier.score = 5;
+  stepGame(state, {}, 0);
+  assert.ok(state.revengePowerUp, "the revenge parachute did not appear at five total kills");
+
+  carrier.x = state.revengePowerUp.x;
+  carrier.y = state.revengePowerUp.y;
+  stepGame(state, {}, 0);
+  assert.equal(carrier.parachutes, 1);
+  assert.equal(state.revengePowerUp, null);
+
+  carrier.invulnerableFor = 0;
+  attacker.invulnerableFor = 0;
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: carrier.x,
+    y: carrier.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(carrier.alive, false);
+  assert.equal(state.groundPilots[0]?.ownerId, carrier.id);
+  assert.equal(state.groundPilots[0]?.falling, true);
+
+  stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
+  assert.ok(state.pilotBullets.some((bullet) => bullet.ownerId === carrier.id));
+
+  const pilot = state.groundPilots[0];
+  pilot.invulnerableFor = 0;
+  state.bullets.push({
+    id: state.nextBulletId++,
+    ownerId: attacker.id,
+    x: pilot.x,
+    y: pilot.y,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(state, {}, 0);
+  assert.equal(state.groundPilots.length, 0);
+  assert.ok(state.events.some((event) => event.type === "pilot-shot"));
+});
+
+test("the pilot machine gun needs sustained fire to destroy a plane", () => {
+  const state = createGame("free-for-all", null, false, true, 1);
+  const gunner = addPlayer(state, "gunner", "GUNNER");
+  const target = addPlayer(state, "target", "TARGET");
+  gunner.alive = false;
+  gunner.respawnIn = 3;
+  target.invulnerableFor = 0;
+  state.groundPilots.push({
+    ownerId: gunner.id,
+    x: target.x,
+    y: 580,
+    vx: 0,
+    vy: 0,
+    falling: false,
+    wreck: false,
+    fireCooldown: 0,
+    invulnerableFor: 0,
+  });
+
+  for (let hit = 1; hit <= 6; hit += 1) {
+    state.pilotBullets.push({
+      id: state.nextPilotBulletId++,
+      ownerId: gunner.id,
+      x: target.x,
+      y: target.y,
+      vx: 0,
+      vy: 0,
+      life: 1,
+    });
+    stepGame(state, {}, 0);
+    assert.equal(target.alive, hit < 6);
+  }
+
+  assert.equal(gunner.score, 1);
+});
+
+test("bombs launch revenge pilots and missiles vaporize them", () => {
+  const bombState = createGame("free-for-all", null, true, true);
+  const bomber = addPlayer(bombState, "bomber", "BOMBER");
+  const bombTarget = addPlayer(bombState, "target", "TARGET");
+  bombTarget.alive = false;
+  bombState.groundPilots.push({
+    ownerId: bombTarget.id,
+    x: 500,
+    y: groundY(500) - 7,
+    vx: 0,
+    vy: 0,
+    falling: false,
+    wreck: false,
+    fireCooldown: 0,
+    invulnerableFor: 0,
+  });
+  bombState.bombs.push({
+    id: bombState.nextBombId++,
+    ownerId: bomber.id,
+    x: 500,
+    y: groundY(500) - 3,
+    vx: 0,
+    vy: 0,
+    life: 1,
+  });
+  stepGame(bombState, {}, 0);
+  assert.ok(bombState.events.some((event) => event.type === "pilot-bombed"));
+
+  const missileState = createGame();
+  const attacker = addPlayer(missileState, "attacker", "ATTACKER");
+  const missileTarget = addPlayer(missileState, "target", "TARGET");
+  missileTarget.alive = false;
+  missileState.groundPilots.push({
+    ownerId: missileTarget.id,
+    x: 500,
+    y: 300,
+    vx: 0,
+    vy: 0,
+    falling: true,
+    wreck: false,
+    fireCooldown: 0,
+    invulnerableFor: 0,
+  });
+  missileState.missiles.push({
+    id: missileState.nextMissileId++,
+    ownerId: attacker.id,
+    x: 500,
+    y: 300,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    dropFor: 0,
+    boosted: true,
+    life: 1,
+  });
+  stepGame(missileState, {}, 0);
+  assert.ok(missileState.events.some((event) => event.type === "pilot-vaporized"));
+});
+
+test("sea crashes leave an armed pilot on the wreck and mountains shape collision terrain", () => {
+  const sea = createGame("free-for-all", null, false, true, 1, "sea");
+  const pilot = addPlayer(sea, "pilot", "PILOT");
+  pilot.invulnerableFor = 0;
+  pilot.x = 420;
+  pilot.y = groundY(pilot.x, "sea") - 12;
+  stepGame(sea, {}, 0);
+  assert.equal(pilot.alive, false);
+  assert.equal(sea.groundPilots[0]?.wreck, true);
+  assert.ok(sea.events.some((event) => event.type === "sea-crash"));
+
+  assert.ok(groundY(260, "mountains") < groundY(600, "mountains") - 200);
+  assert.ok(groundY(900, "mountains") < groundY(600, "mountains") - 150);
+
+  const mountains = createGame("free-for-all", null, false, true, 1, "mountains");
+  for (let index = 0; index < 6; index += 1) addPlayer(mountains, `mountain-${index}`, `M${index}`);
+  assert.ok(mountains.players.every((plane) => groundY(plane.x, "mountains") - plane.y >= 100));
+});
+
+test("large clouds hide planes and pixel faces remain network safe", () => {
+  const state = createGame();
+  const pilot = addPlayer(state, "pilot", "PILOT");
+  const cloud = cloudPosition(state.time, 2);
+  pilot.x = cloud.x + 40 * cloud.size;
+  pilot.y = cloud.y + 15 * cloud.size;
+  assert.equal(planeInCloud(state, pilot), true);
+  assert.equal(cleanFace(DEFAULT_FACE), DEFAULT_FACE);
+  assert.equal(cleanFace("not a face"), DEFAULT_FACE);
 });
 
 test("every pilot earns an accumulating missile at each three-kill milestone", () => {
@@ -446,6 +650,7 @@ test("a free-for-all ends when a pilot reaches the selected score", () => {
   stepGame(state, {}, 0);
   assert.deepEqual(state.winner, { kind: "pilot", playerId: ace.id });
   assert.equal(ace.score, 10);
+  assert.ok(state.events.some((event) => event.type === "victory"));
 
   const frozenX = ace.x;
   stepGame(state, { [ace.id]: { turn: 1, fire: true } }, FRAME);

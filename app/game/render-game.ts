@@ -1,7 +1,9 @@
 import {
   bombPowerUpPosition,
+  CLOUD_COUNT,
   cloudPosition,
   groundY,
+  planeInCloud,
   planeSpeed,
   ROLL_DURATION,
   WORLD_HEIGHT,
@@ -11,7 +13,13 @@ import {
 } from "../../lib/game-core";
 import { wrapChatText } from "../../lib/chat";
 
-type Burst = { x: number; y: number; born: number; color: string; kind: "plane" | "bomb" | "missile" };
+type Burst = {
+  x: number;
+  y: number;
+  born: number;
+  color: string;
+  kind: "plane" | "bomb" | "missile" | "pilot" | "pilot-bomb" | "vapor" | "splash";
+};
 type MissileTrailPixel = { x: number; y: number; born: number };
 export type ChatBubble = { playerId: string; text: string; expiresAt: number };
 
@@ -50,15 +58,18 @@ export function renderGame(
   drawSky(context);
   drawClouds(context, state.time);
   drawBombPowerUps(context, state);
-  drawTerrain(context);
+  drawRevengePowerUp(context, state);
+  drawTerrain(context, state);
   drawBombs(context, state);
   drawMissiles(context, state, frameTime);
   drawBullets(context, state);
+  drawPilotBullets(context, state);
   captureBursts(state, frameTime);
   drawBursts(context, frameTime);
   for (const plane of state.players) {
-    if (plane.alive) drawPlane(context, plane, plane.id === viewerId, state.time);
+    if (plane.alive && !planeInCloud(state, plane)) drawPlane(context, plane, plane.id === viewerId, state.time);
   }
+  drawGroundPilots(context, state, viewerId);
   drawSpeechBubbles(context, state, chatBubbles, frameTime);
 }
 
@@ -68,7 +79,7 @@ function drawSky(context: CanvasRenderingContext2D) {
 }
 
 function drawClouds(context: CanvasRenderingContext2D, time: number) {
-  for (let index = 0; index < 2; index += 1) {
+  for (let index = 0; index < CLOUD_COUNT; index += 1) {
     const cloud = cloudPosition(time, index);
     drawPixelCloud(context, cloud.x, cloud.y, cloud.size);
   }
@@ -83,13 +94,24 @@ function drawPixelCloud(context: CanvasRenderingContext2D, x: number, y: number,
   context.fillRect(x - unit, y + unit, unit * 10, unit * 2);
 }
 
-function drawTerrain(context: CanvasRenderingContext2D) {
-  const ground = groundY(0);
-  context.fillStyle = "#f2a913";
-  context.fillRect(0, ground, WORLD_WIDTH, WORLD_HEIGHT - ground);
-  context.fillStyle = "#17131f";
-  context.fillRect(0, ground, WORLD_WIDTH, 7);
-  drawTower(context, WORLD_WIDTH / 2, ground);
+function drawTerrain(context: CanvasRenderingContext2D, state: GameState) {
+  const fill = state.landscape === "tower" ? "#f2a913" : "#17131f";
+  for (let x = 0; x < WORLD_WIDTH; x += 12) {
+    const surface = groundY(x + 6, state.landscape);
+    context.fillStyle = fill;
+    context.fillRect(x, surface, 12, WORLD_HEIGHT - surface);
+    context.fillStyle = state.landscape === "mountains" ? "#f2a913" : "#17131f";
+    context.fillRect(x, surface, 12, 6);
+  }
+  if (state.landscape === "sea") {
+    context.fillStyle = "#fffdf8";
+    for (let x = 8; x < WORLD_WIDTH; x += 48) {
+      const offset = Math.floor(x / 48) % 2 === 0 ? 0 : 5;
+      context.fillRect(x, 604 + offset, 20, 3);
+    }
+    return;
+  }
+  if (state.landscape === "tower") drawTower(context, WORLD_WIDTH / 2, groundY(WORLD_WIDTH / 2, "tower"));
 }
 
 function drawTower(context: CanvasRenderingContext2D, x: number, ground: number) {
@@ -108,6 +130,72 @@ function drawBullets(context: CanvasRenderingContext2D, state: GameState) {
   context.fillStyle = "#fffdf8";
   for (const bullet of state.bullets) {
     context.fillRect(Math.round(bullet.x) - 4, Math.round(bullet.y) - 2, 8, 4);
+  }
+}
+
+function drawPilotBullets(context: CanvasRenderingContext2D, state: GameState) {
+  context.fillStyle = "#fffdf8";
+  for (const bullet of state.pilotBullets) {
+    context.fillRect(Math.round(bullet.x) - 1, Math.round(bullet.y) - 4, 3, 7);
+  }
+}
+
+function drawRevengePowerUp(context: CanvasRenderingContext2D, state: GameState) {
+  const powerUp = state.revengePowerUp;
+  if (!powerUp) return;
+  const flash = Math.floor(state.time * 5) % 2 === 0;
+  context.save();
+  context.translate(Math.round(powerUp.x), Math.round(powerUp.y));
+  context.fillStyle = flash ? "#fffdf8" : "#f2a913";
+  context.fillRect(-18, -16, 36, 7);
+  context.fillRect(-13, -22, 26, 7);
+  context.fillRect(-6, -27, 12, 6);
+  context.fillStyle = "#17131f";
+  context.fillRect(-13, -9, 3, 17);
+  context.fillRect(10, -9, 3, 17);
+  context.fillRect(-6, 7, 12, 13);
+  context.font = gameFont(8);
+  context.textAlign = "center";
+  context.fillText("REVENGE", 0, 34);
+  context.restore();
+}
+
+function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, viewerId: string) {
+  for (const pilot of state.groundPilots) {
+    const owner = state.players.find((plane) => plane.id === pilot.ownerId);
+    const color = owner?.color ?? "#f02b10";
+    context.save();
+    context.translate(Math.round(pilot.x), Math.round(pilot.y));
+    if (pilot.invulnerableFor > 0 && Math.floor(state.time * 10) % 2 === 0) context.globalAlpha = 0.35;
+    if (pilot.wreck) {
+      context.fillStyle = color;
+      context.fillRect(-24, 3, 46, 6);
+      context.fillRect(-12, -1, 20, 5);
+      context.fillStyle = "#17131f";
+      context.fillRect(10, -2, 13, 3);
+    }
+    if (pilot.falling) {
+      context.fillStyle = "#fffdf8";
+      context.fillRect(-18, -35, 36, 6);
+      context.fillRect(-13, -41, 26, 6);
+      context.fillRect(-5, -46, 10, 5);
+      context.fillStyle = "#17131f";
+      context.fillRect(-13, -29, 3, 20);
+      context.fillRect(10, -29, 3, 20);
+    }
+    context.fillStyle = "#fffdf8";
+    context.fillRect(-4, -10, 8, 7);
+    context.fillStyle = color;
+    context.fillRect(-5, -3, 10, 11);
+    context.fillStyle = "#17131f";
+    context.fillRect(3, -5, 11, 3);
+    context.fillRect(-7, 8, 5, 7);
+    context.fillRect(2, 8, 5, 7);
+    if (pilot.ownerId === viewerId) {
+      context.fillStyle = "#fffdf8";
+      context.fillRect(-2, 18, 5, 5);
+    }
+    context.restore();
   }
 }
 
@@ -201,6 +289,14 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
     : 1;
   context.scale(1, plane.liftSide * rollScale);
   if (plane.invulnerableFor > 0 && Math.floor(time * 8) % 2 === 0) context.globalAlpha = 0.35;
+  if (plane.damage >= 2) {
+    context.fillStyle = "#17131f";
+    for (let index = 0; index < 4; index += 1) {
+      const drift = ((time * 38 + index * 11) % 38);
+      const smokeY = (index % 2 === 0 ? -1 : 1) * (5 + drift * 0.22);
+      context.fillRect(-25 - drift, smokeY, 6 - (index % 2), 6 - (index % 2));
+    }
+  }
   context.fillStyle = plane.color;
   context.fillRect(-18, -3, 34, 7);
   context.fillRect(-9, -9, 21, 4);
@@ -211,6 +307,8 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
   context.fillRect(-2, -6, 6, 4);
   context.fillRect(-4, -5, 2, 12);
   context.fillRect(8, -5, 2, 12);
+  if (plane.damage >= 1) context.fillRect(-15, -3, 8, 7);
+  if (plane.damage >= 2) context.fillRect(4, 7, 8, 4);
   context.fillStyle = "#fffdf8";
   const propeller = Math.floor(time * 16) % 2 === 0 ? -8 : -4;
   context.fillRect(22, propeller, 2, 12);
@@ -248,12 +346,17 @@ function drawSpeechBubbles(
     .sort((a, b) => {
       const aPlane = state.players.find((plane) => plane.id === a.playerId);
       const bPlane = state.players.find((plane) => plane.id === b.playerId);
-      return (aPlane?.y ?? 0) - (bPlane?.y ?? 0);
+      const aPilot = state.groundPilots.find((pilot) => pilot.ownerId === a.playerId);
+      const bPilot = state.groundPilots.find((pilot) => pilot.ownerId === b.playerId);
+      return (aPlane?.alive ? aPlane.y : aPilot?.y ?? 0) - (bPlane?.alive ? bPlane.y : bPilot?.y ?? 0);
     });
 
   for (const bubble of active) {
     const plane = state.players.find((candidate) => candidate.id === bubble.playerId);
-    if (!plane?.alive) continue;
+    const groundPilot = state.groundPilots.find((pilot) => pilot.ownerId === bubble.playerId);
+    if (!plane || (!plane.alive && !groundPilot) || (plane.alive && planeInCloud(state, plane))) continue;
+    const anchorX = plane.alive ? plane.x : groundPilot?.x ?? plane.x;
+    const anchorY = plane.alive ? plane.y : groundPilot?.y ?? plane.y;
     const lines = wrapChatText(bubble.text);
     if (!lines.length) continue;
 
@@ -268,12 +371,12 @@ function drawSpeechBubbles(
       Math.max(64, ...lines.map((line) => Math.ceil(context.measureText(line).width) + 20)),
     );
     const height = lines.length * 14 + 12;
-    const abovePlane = plane.y > height + 64;
-    const x = clamp(plane.x - width / 2, 7, WORLD_WIDTH - width - 7);
+    const abovePlane = anchorY > height + 64;
+    const x = clamp(anchorX - width / 2, 7, WORLD_WIDTH - width - 7);
     const y = abovePlane
-      ? plane.y - height - 45
-      : Math.min(WORLD_HEIGHT - height - 8, plane.y + 34);
-    const tailX = clamp(plane.x, x + 12, x + width - 12);
+      ? anchorY - height - 45
+      : Math.min(WORLD_HEIGHT - height - 8, anchorY + 34);
+    const tailX = clamp(anchorX, x + 12, x + width - 12);
 
     context.fillStyle = "#17131f";
     context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
@@ -337,6 +440,31 @@ function captureBursts(state: GameState, frameTime: number) {
           kind: "plane",
         });
       }
+      continue;
+    }
+    if (event.type === "sea-crash" && event.x !== undefined && event.y !== undefined) {
+      bursts.set(event.id, {
+        x: event.x,
+        y: event.y,
+        born: frameTime,
+        color: "#fffdf8",
+        kind: "splash",
+      });
+      continue;
+    }
+    if (
+      (event.type === "pilot-shot" || event.type === "pilot-bombed" || event.type === "pilot-vaporized") &&
+      event.x !== undefined &&
+      event.y !== undefined
+    ) {
+      const target = state.players.find((plane) => plane.id === event.targetId);
+      bursts.set(event.id, {
+        x: event.x,
+        y: event.y,
+        born: frameTime,
+        color: target?.color ?? "#f02b10",
+        kind: event.type === "pilot-bombed" ? "pilot-bomb" : event.type === "pilot-vaporized" ? "vapor" : "pilot",
+      });
     }
   }
 }
@@ -344,7 +472,7 @@ function captureBursts(state: GameState, frameTime: number) {
 function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
   for (const [id, burst] of bursts) {
     const age = (frameTime - burst.born) / 1000;
-    const duration = burst.kind === "bomb" ? 1 : burst.kind === "missile" ? 0.55 : 0.8;
+    const duration = burst.kind === "bomb" || burst.kind === "pilot-bomb" ? 1 : burst.kind === "missile" || burst.kind === "vapor" ? 0.55 : 0.8;
     if (age > duration) {
       bursts.delete(id);
       continue;
@@ -353,16 +481,19 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
     context.save();
     context.translate(burst.x, burst.y);
     context.globalAlpha = 1 - progress;
-    const count = burst.kind === "bomb" ? 16 : burst.kind === "missile" ? 10 : 8;
+    const count = burst.kind === "bomb" ? 16 : burst.kind === "missile" ? 10 : burst.kind === "vapor" ? 12 : burst.kind === "splash" ? 12 : 8;
     for (let index = 0; index < count; index += 1) {
       const angle = (index / count) * Math.PI * 2;
-      const spread = burst.kind === "bomb" ? 108 : burst.kind === "missile" ? 46 : 18 + (index % 2) * 10;
+      const spread = burst.kind === "bomb" ? 108 : burst.kind === "missile" ? 46 : burst.kind === "vapor" ? 58 : burst.kind === "splash" ? 64 : 18 + (index % 2) * 10;
+      const launchedY = burst.kind === "pilot-bomb" ? -progress * 100 + progress * progress * 70 : 0;
+      const vaporY = burst.kind === "vapor" ? -progress * 54 : 0;
+      const splashY = burst.kind === "splash" ? -Math.abs(Math.sin(angle)) * progress * 72 : 0;
       const radius = 5 + progress * spread;
       context.fillStyle = index % 3 === 0 ? "#17131f" : index % 2 === 0 ? "#f2a913" : burst.color;
-      const size = burst.kind === "bomb" ? 12 : burst.kind === "missile" ? 7 : 8;
+      const size = burst.kind === "bomb" ? 12 : burst.kind === "missile" ? 7 : burst.kind === "vapor" ? 5 : 8;
       context.fillRect(
         Math.round(Math.cos(angle) * radius) - size / 2,
-        Math.round(Math.sin(angle) * radius) - size / 2,
+        Math.round(Math.sin(angle) * radius + launchedY + vaporY + splashY) - size / 2,
         size,
         size,
       );
@@ -382,6 +513,7 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 export function pilotReadout(state: GameState, pilotId: string) {
   const plane = state.players.find((candidate) => candidate.id === pilotId);
+  const groundPilot = state.groundPilots.find((candidate) => candidate.ownerId === pilotId);
   if (!plane) {
     return {
       speed: 0,
@@ -394,22 +526,30 @@ export function pilotReadout(state: GameState, pilotId: string) {
       respawnIn: 0,
       bombs: 0,
       missiles: 0,
+      parachutes: 0,
       shotsRemaining: 0,
       reloadIn: 0,
+      onFoot: false,
+      parachuting: false,
+      damage: 0,
     };
   }
   return {
-    speed: Math.round(planeSpeed(plane)),
-    altitude: Math.max(0, Math.round(groundY(plane.x) - plane.y)),
+    speed: groundPilot ? Math.round(Math.abs(groundPilot.vx)) : Math.round(planeSpeed(plane)),
+    altitude: groundPilot ? 0 : Math.max(0, Math.round(groundY(plane.x, state.landscape) - plane.y)),
     stalled: plane.stalled,
-    protected: plane.invulnerableFor > 0,
+    protected: groundPilot ? groundPilot.invulnerableFor > 0 : plane.invulnerableFor > 0,
     rolling: plane.rollFor > 0,
     rollCooldown: Math.max(0, plane.rollCooldown ?? 0),
-    alive: plane.alive,
+    alive: plane.alive || Boolean(groundPilot),
     respawnIn: Math.max(0, plane.respawnIn),
     bombs: plane.bombs,
     missiles: plane.missiles,
+    parachutes: plane.parachutes ?? 0,
     shotsRemaining: plane.shotsRemaining,
     reloadIn: Math.max(0, plane.reloadIn),
+    onFoot: Boolean(groundPilot),
+    parachuting: Boolean(groundPilot?.falling),
+    damage: plane.damage ?? 0,
   };
 }
