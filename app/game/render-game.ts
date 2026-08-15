@@ -195,7 +195,13 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
     context.fillStyle = "#17131f";
     const aim = pilot.aim ?? 0;
     if (aim === 0) context.fillRect(-1, -17, 3, 10);
-    else context.fillRect(aim > 0 ? 3 : -14, -6, 11, 3);
+    else if (Math.abs(aim) === 2) context.fillRect(aim > 0 ? 3 : -14, -6, 11, 3);
+    else {
+      const direction = aim > 0 ? 1 : -1;
+      context.fillRect(direction > 0 ? 3 : -7, -9, 5, 3);
+      context.fillRect(direction > 0 ? 6 : -10, -12, 5, 3);
+      context.fillRect(direction > 0 ? 9 : -13, -15, 5, 3);
+    }
     context.fillRect(-7, 8, 5, 7);
     context.fillRect(2, 8, 5, 7);
     if (pilot.ownerId === viewerId) {

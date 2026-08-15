@@ -82,7 +82,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /PLANE DAMAGE/);
   assert.match(component, /REVENGE PILOT/);
   assert.match(component, /6 PILOT HITS = 1 PLANE HIT/);
-  assert.match(component, /FIRE SHOOTS UP OR SIDEWAYS/);
+  assert.match(component, /ADD W OR UP = DIAGONAL/);
+  assert.match(component, /MOVE \/ AIM/);
   assert.match(component, /3 HIT MODE \/ DAMAGED \/ SMOKE \/ EXPLODE/);
   assert.match(component, /LANDSCAPE/);
   assert.match(component, /MOUNTAINS/);
@@ -109,6 +110,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /missileMilestones/);
   assert.match(core, /cloudPosition/);
   assert.match(core, /PILOT_GUN_HITS = 6/);
+  assert.match(core, /aimUp/);
   assert.match(core, /SEA_WRECK_SINK_TIME = 5/);
   assert.match(core, /GroundPilot/);
   assert.match(core, /revengePowerUp/);
@@ -127,6 +129,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawRevengePowerUp/);
   assert.match(renderer, /drawGroundPilots/);
   assert.match(renderer, /drawPilotBullets/);
+  assert.match(renderer, /Math\.abs\(aim\) === 2/);
   assert.match(renderer, /planeInCloud/);
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
@@ -140,6 +143,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyDuelPixel"/);
   assert.match(styles, /\.arcade-controls/);
+  assert.match(styles, /--stick-y/);
   assert.match(styles, /\.callsign-preview/);
   assert.doesNotMatch(styles, /\.face-editor|\.pixel-portrait/);
   assert.match(styles, /\.pilot-lineup/);
