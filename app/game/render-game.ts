@@ -12,9 +12,11 @@ import {
 import { wrapChatText } from "../../lib/chat";
 
 type Burst = { x: number; y: number; born: number; color: string; kind: "plane" | "bomb" | "missile" };
+type MissileTrailPixel = { x: number; y: number; born: number };
 export type ChatBubble = { playerId: string; text: string; expiresAt: number };
 
 const bursts = new Map<number, Burst>();
+const missileTrails = new Map<string, MissileTrailPixel[]>();
 let lastEventId = 0;
 
 export function renderGame(
@@ -44,7 +46,7 @@ export function renderGame(
   drawBombPowerUps(context, state);
   drawTerrain(context);
   drawBombs(context, state);
-  drawMissiles(context, state);
+  drawMissiles(context, state, frameTime);
   drawBullets(context, state);
   captureBursts(state, frameTime);
   drawBursts(context, frameTime);
@@ -136,27 +138,50 @@ function drawBombs(context: CanvasRenderingContext2D, state: GameState) {
   }
 }
 
-function drawMissiles(context: CanvasRenderingContext2D, state: GameState) {
+function drawMissiles(context: CanvasRenderingContext2D, state: GameState, frameTime: number) {
+  for (const missile of state.missiles) {
+    if (!missile.boosted) continue;
+    const key = `${missile.ownerId}:${missile.id}`;
+    const trail = missileTrails.get(key) ?? [];
+    const last = trail.at(-1);
+    const trailX = missile.x - Math.cos(missile.angle) * 7;
+    const trailY = missile.y - Math.sin(missile.angle) * 7;
+    if (!last || Math.hypot(trailX - last.x, trailY - last.y) >= 6 || frameTime - last.born >= 55) {
+      trail.push({ x: trailX, y: trailY, born: frameTime });
+      missileTrails.set(key, trail);
+    }
+  }
+
+  for (const [key, trail] of missileTrails) {
+    const visible = trail.filter((pixel) => frameTime - pixel.born < 720);
+    if (!visible.length) {
+      missileTrails.delete(key);
+      continue;
+    }
+    missileTrails.set(key, visible);
+    for (const pixel of visible) {
+      const age = (frameTime - pixel.born) / 720;
+      const size = age < 0.45 ? 4 : age < 0.75 ? 3 : 2;
+      context.globalAlpha = Math.max(0, 0.82 * (1 - age));
+      context.fillStyle = "#fffdf8";
+      context.fillRect(Math.round(pixel.x) - Math.floor(size / 2), Math.round(pixel.y) - Math.floor(size / 2), size, size);
+    }
+  }
+  context.globalAlpha = 1;
+
   for (const missile of state.missiles) {
     context.save();
     context.translate(Math.round(missile.x), Math.round(missile.y));
     context.rotate(missile.boosted ? missile.angle : Math.atan2(missile.vy, missile.vx || 1));
     if (missile.boosted) {
-      context.fillStyle = "#fffdf8";
-      for (let index = 1; index <= 5; index += 1) {
-        const size = Math.max(2, 7 - index);
-        context.globalAlpha = 1 - index * 0.13;
-        context.fillRect(-15 - index * 8, -Math.ceil(size / 2), 7, size);
-      }
-      context.globalAlpha = 1;
       context.fillStyle = "#f2a913";
-      context.fillRect(-13, -4, 6, 8);
+      context.fillRect(-8, -1, 3, 3);
     }
     context.fillStyle = "#17131f";
-    context.fillRect(-8, -4, 18, 8);
-    context.fillRect(-7, -7, 5, 14);
+    context.fillRect(-5, -1, 11, 3);
+    context.fillRect(-4, -2, 2, 5);
     context.fillStyle = "#fffdf8";
-    context.fillRect(7, -2, 5, 4);
+    context.fillRect(5, 0, 3, 1);
     context.restore();
   }
 }
