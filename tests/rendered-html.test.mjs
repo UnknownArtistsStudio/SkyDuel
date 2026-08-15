@@ -91,6 +91,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawBombs/);
   assert.match(renderer, /drawMissiles/);
   assert.match(renderer, /missileTrails/);
+  assert.match(renderer, /resetRendererEffects/);
   assert.match(renderer, /#9b90f4/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
   assert.doesNotMatch(renderer, /ui-monospace|SFMono|Menlo/);

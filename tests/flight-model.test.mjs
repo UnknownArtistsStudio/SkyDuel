@@ -330,6 +330,26 @@ test("bomb power-ups can be collected and dropped", () => {
   assert.ok(state.events.some((event) => event.type === "bomb-drop"));
 });
 
+test("a dropped bomb visibly detonates when it reaches the ground", () => {
+  const state = createGame("free-for-all", null, true);
+  const pilot = addPlayer(state, "pilot", "PILOT");
+  pilot.x = 400;
+  pilot.y = 260;
+  pilot.vy = 0;
+  pilot.invulnerableFor = 0;
+  pilot.bombs = 1;
+
+  stepGame(state, { pilot: { turn: 0, fire: false, bomb: true, roll: false } }, 0);
+  for (let frame = 0; frame < 300 && state.bombs.length > 0; frame += 1) {
+    stepGame(state, {}, FRAME);
+  }
+
+  const explosion = state.events.find((event) => event.type === "bomb-explosion");
+  assert.equal(state.bombs.length, 0, "the bomb passed through the ground");
+  assert.ok(explosion, "the ground impact did not emit an explosion effect");
+  assert.ok(explosion.y >= groundY(explosion.x) - 6, "the explosion appeared above the impact point");
+});
+
 test("one bomb blast can score several opponents", () => {
   const state = createGame("free-for-all", null, true);
   const owner = addPlayer(state, "owner", "OWNER");

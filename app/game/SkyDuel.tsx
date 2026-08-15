@@ -27,7 +27,7 @@ import {
   type VoiceClipPayload,
 } from "../../lib/radio";
 import { PeerRoom } from "./peer-room";
-import { pilotReadout, renderGame, type ChatBubble } from "./render-game";
+import { pilotReadout, renderGame, resetRendererEffects, type ChatBubble } from "./render-game";
 
 type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
@@ -274,6 +274,7 @@ export function SkyDuel() {
         setScreen("menu");
         setMode(null);
         gameRef.current = makeAttractGame();
+        resetRendererEffects();
       }
     };
     room.onMessage = (peerId, rawMessage) => {
@@ -308,6 +309,7 @@ export function SkyDuel() {
       if (role === "guest" && incoming.type === "welcome") {
         localIdRef.current = incoming.playerId;
         gameRef.current = incoming.state;
+        resetRendererEffects();
         lastSoundEventRef.current = 0;
         setMatchMode(incoming.state.matchMode);
         setScoreLimit(incoming.state.scoreLimit);
@@ -355,6 +357,7 @@ export function SkyDuel() {
     addPlayer(state, playerId, cleanName(callsign));
     addPlayer(state, "practice-rival", "RIVAL");
     gameRef.current = state;
+    resetRendererEffects();
     clearChat();
     lastSoundEventRef.current = 0;
     localIdRef.current = playerId;
@@ -378,6 +381,7 @@ export function SkyDuel() {
       const state = createGame(matchMode, scoreLimit, bombsEnabled);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
       gameRef.current = state;
+      resetRendererEffects();
       clearChat();
       lastSoundEventRef.current = 0;
       localIdRef.current = room.info.peerId;
@@ -437,6 +441,7 @@ export function SkyDuel() {
     void roomRef.current?.close();
     roomRef.current = null;
     gameRef.current = makeAttractGame();
+    resetRendererEffects();
     lastSoundEventRef.current = 0;
     localIdRef.current = "";
     inputRef.current = { ...neutralInput };
