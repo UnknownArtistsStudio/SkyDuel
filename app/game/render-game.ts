@@ -58,7 +58,6 @@ export function renderGame(
   drawSky(context);
   drawClouds(context, state.time);
   drawBombPowerUps(context, state);
-  drawRevengePowerUp(context, state);
   drawTerrain(context, state);
   drawBombs(context, state);
   drawMissiles(context, state, frameTime);
@@ -142,26 +141,6 @@ function drawPilotBullets(context: CanvasRenderingContext2D, state: GameState) {
   for (const bullet of state.pilotBullets) {
     context.fillRect(Math.round(bullet.x) - 1, Math.round(bullet.y) - 1, 2, 2);
   }
-}
-
-function drawRevengePowerUp(context: CanvasRenderingContext2D, state: GameState) {
-  const powerUp = state.revengePowerUp;
-  if (!powerUp) return;
-  const flash = Math.floor(state.time * 5) % 2 === 0;
-  context.save();
-  context.translate(Math.round(powerUp.x), Math.round(powerUp.y));
-  context.fillStyle = flash ? "#fffdf8" : "#f2a913";
-  context.fillRect(-18, -16, 36, 7);
-  context.fillRect(-13, -22, 26, 7);
-  context.fillRect(-6, -27, 12, 6);
-  context.fillStyle = "#17131f";
-  context.fillRect(-13, -9, 3, 17);
-  context.fillRect(10, -9, 3, 17);
-  context.fillRect(-6, 7, 12, 13);
-  context.font = gameFont(8);
-  context.textAlign = "center";
-  context.fillText("REVENGE", 0, 34);
-  context.restore();
 }
 
 function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, viewerId: string) {
@@ -541,7 +520,6 @@ export function pilotReadout(state: GameState, pilotId: string) {
       respawnIn: 0,
       bombs: 0,
       missiles: 0,
-      parachutes: 0,
       shotsRemaining: 0,
       reloadIn: 0,
       onFoot: false,
@@ -560,7 +538,6 @@ export function pilotReadout(state: GameState, pilotId: string) {
     respawnIn: Math.max(0, plane.respawnIn),
     bombs: plane.bombs,
     missiles: plane.missiles,
-    parachutes: plane.parachutes ?? 0,
     shotsRemaining: plane.shotsRemaining,
     reloadIn: Math.max(0, plane.reloadIn),
     onFoot: Boolean(groundPilot),

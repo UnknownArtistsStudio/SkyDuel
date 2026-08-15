@@ -76,7 +76,6 @@ export type Plane = {
   missileMilestones: number;
   damage: number;
   pilotDamage: number;
-  parachutes: number;
   joinedAt: number;
 };
 
@@ -103,11 +102,6 @@ export type Bomb = {
 export type BombPowerUp = {
   id: number;
   cloudIndex: number;
-};
-
-export type RevengePowerUp = {
-  x: number;
-  y: number;
 };
 
 export type GroundPilot = {
@@ -167,8 +161,6 @@ export type GameEvent = {
     | "missile-hit"
     | "plane-hit"
     | "mayday"
-    | "revenge-spawn"
-    | "revenge-pickup"
     | "pilot-eject"
     | "pilot-shot"
     | "pilot-bombed"
@@ -195,7 +187,6 @@ export type GameState = {
   bombs: Bomb[];
   missiles: Missile[];
   bombPowerUps: BombPowerUp[];
-  revengePowerUp: RevengePowerUp | null;
   groundPilots: GroundPilot[];
   pilotBullets: PilotBullet[];
   bombSpawnIn: number;
@@ -203,8 +194,7 @@ export type GameState = {
   matchMode: MatchMode;
   scoreLimit: ScoreLimit;
   bombsEnabled: boolean;
-  revengeEnabled: boolean;
-  revengeSpawned: boolean;
+  parachuteMode: boolean;
   planeHits: PlaneHits;
   landscape: Landscape;
   winner: GameWinner | null;
@@ -226,7 +216,7 @@ export function createGame(
   matchMode: MatchMode = "free-for-all",
   scoreLimit: ScoreLimit = 10,
   bombsEnabled = false,
-  revengeEnabled = true,
+  parachuteMode = true,
   planeHits: PlaneHits = 1,
   landscape: Landscape = "tower",
 ): GameState {
@@ -243,7 +233,6 @@ export function createGame(
     bombs: [],
     missiles: [],
     bombPowerUps: [],
-    revengePowerUp: null,
     groundPilots: [],
     pilotBullets: [],
     bombSpawnIn: nextBombDelay(true),
@@ -251,8 +240,7 @@ export function createGame(
     matchMode,
     scoreLimit,
     bombsEnabled,
-    revengeEnabled,
-    revengeSpawned: false,
+    parachuteMode,
     planeHits,
     landscape,
     winner: null,
@@ -321,7 +309,6 @@ function makePlane(
     missileMilestones: 0,
     damage: 0,
     pilotDamage: 0,
-    parachutes: 0,
     joinedAt,
   };
 }
@@ -506,7 +493,6 @@ export function stepGame(
     }
   }
 
-  updateRevengePowerUp(state);
   updateBombPowerUps(state, safeDt);
   updateGroundPilots(state, inputs, safeDt);
   updateBombs(state, safeDt);
@@ -520,7 +506,6 @@ export function stepGame(
     state.bombs = [];
     state.missiles = [];
     state.bombPowerUps = [];
-    state.revengePowerUp = null;
     state.pilotBullets = [];
   }
 }
@@ -619,31 +604,6 @@ function updateBombPowerUps(state: GameState, dt: number) {
     pushEvent(state, "bomb-pickup", collector.id, undefined, position.x, position.y);
     break;
   }
-}
-
-function updateRevengePowerUp(state: GameState) {
-  if (!state.revengeEnabled) {
-    state.revengePowerUp = null;
-    return;
-  }
-  const totalKills = state.players.reduce((total, plane) => total + plane.score, 0);
-  if (!state.revengeSpawned && totalKills >= 5) {
-    state.revengeSpawned = true;
-    state.revengePowerUp = { x: WORLD_WIDTH / 2, y: 285 };
-    pushEvent(state, "revenge-spawn", "parachute", undefined, WORLD_WIDTH / 2, 285);
-  }
-  const powerUp = state.revengePowerUp;
-  if (!powerUp) return;
-  const collector = state.players.find((plane) => {
-    if (!plane.alive || plane.parachutes > 0) return false;
-    const dx = wrappedDistance(powerUp.x, plane.x);
-    const dy = powerUp.y - plane.y;
-    return dx * dx + dy * dy < 26 * 26;
-  });
-  if (!collector) return;
-  collector.parachutes = 1;
-  state.revengePowerUp = null;
-  pushEvent(state, "revenge-pickup", collector.id, undefined, powerUp.x, powerUp.y);
 }
 
 function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>, dt: number) {
@@ -1019,10 +979,9 @@ function destroyPlane(
   const impactVx = plane.vx;
   const impactVy = plane.vy;
   const ejects = Boolean(
-    state.revengeEnabled &&
-    plane.parachutes > 0 &&
+    state.parachuteMode &&
     targetId &&
-    cause !== "sea-crash",
+    (cause === "shot" || cause === "bomb" || cause === "missile"),
   );
   const seaWreck = cause === "sea-crash";
   plane.alive = false;
@@ -1039,7 +998,6 @@ function destroyPlane(
   state.bullets = state.bullets.filter((bullet) => bullet.ownerId !== plane.id);
   pushEvent(state, seaWreck ? "sea-crash" : "crash", plane.id, targetId, plane.x, plane.y);
   if (ejects || seaWreck) {
-    if (ejects) plane.parachutes -= 1;
     state.groundPilots = state.groundPilots.filter((pilot) => pilot.ownerId !== plane.id);
     const surface = groundY(plane.x, state.landscape) - 7;
     state.groundPilots.push({
@@ -1106,8 +1064,6 @@ export function resetRound(state: GameState) {
   state.bombs = [];
   state.missiles = [];
   state.bombPowerUps = [];
-  state.revengePowerUp = null;
-  state.revengeSpawned = false;
   state.groundPilots = [];
   state.pilotBullets = [];
   state.bombSpawnIn = nextBombDelay(true);
@@ -1118,7 +1074,6 @@ export function resetRound(state: GameState) {
     plane.deaths = 0;
     plane.missiles = 0;
     plane.missileMilestones = 0;
-    plane.parachutes = 0;
     plane.joinedAt = 0;
     respawnPlane(plane, state.landscape);
   }
