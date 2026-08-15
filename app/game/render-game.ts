@@ -19,6 +19,12 @@ const bursts = new Map<number, Burst>();
 const missileTrails = new Map<string, MissileTrailPixel[]>();
 let lastEventId = 0;
 
+export function resetRendererEffects() {
+  lastEventId = 0;
+  bursts.clear();
+  missileTrails.clear();
+}
+
 export function renderGame(
   canvas: HTMLCanvasElement,
   state: GameState,
@@ -296,6 +302,7 @@ function drawSpeechBubbles(
 }
 
 function captureBursts(state: GameState, frameTime: number) {
+  if (state.nextEventId <= lastEventId) resetRendererEffects();
   for (const event of state.events) {
     if (event.id <= lastEventId) continue;
     lastEventId = Math.max(lastEventId, event.id);
