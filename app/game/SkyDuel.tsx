@@ -449,7 +449,8 @@ export function SkyDuel() {
         sendChat(transcript);
         flashRadio("MESSAGE SENT");
       } else if (recognitionError === "not-allowed" || recognitionError === "service-not-allowed") {
-        flashRadio("MIC BLOCKED / ENTER TO TYPE", 2600);
+        setChatInputOpen(true);
+        flashRadio("MIC BLOCKED / TYPE MESSAGE", 2600);
       } else {
         flashRadio("NO MESSAGE HEARD");
       }
