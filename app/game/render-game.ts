@@ -6,8 +6,10 @@ import {
   type GameState,
   type Plane,
 } from "../../lib/game-core";
+import { wrapChatText } from "../../lib/chat";
 
 type Burst = { x: number; y: number; born: number; color: string };
+export type ChatBubble = { playerId: string; text: string; expiresAt: number };
 
 const bursts = new Map<number, Burst>();
 let lastEventId = 0;
@@ -17,6 +19,7 @@ export function renderGame(
   state: GameState,
   viewerId: string,
   frameTime: number,
+  chatBubbles: readonly ChatBubble[] = [],
 ) {
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
   const displayWidth = Math.max(1, canvas.clientWidth);
@@ -42,6 +45,7 @@ export function renderGame(
   for (const plane of state.players) {
     if (plane.alive) drawPlane(context, plane, plane.id === viewerId, state.time);
   }
+  drawSpeechBubbles(context, state, chatBubbles, frameTime);
 }
 
 function drawSky(context: CanvasRenderingContext2D) {
@@ -130,6 +134,70 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
   context.restore();
 }
 
+function drawSpeechBubbles(
+  context: CanvasRenderingContext2D,
+  state: GameState,
+  chatBubbles: readonly ChatBubble[],
+  frameTime: number,
+) {
+  const active = chatBubbles
+    .filter((bubble) => bubble.expiresAt > frameTime)
+    .sort((a, b) => {
+      const aPlane = state.players.find((plane) => plane.id === a.playerId);
+      const bPlane = state.players.find((plane) => plane.id === b.playerId);
+      return (aPlane?.y ?? 0) - (bPlane?.y ?? 0);
+    });
+
+  for (const bubble of active) {
+    const plane = state.players.find((candidate) => candidate.id === bubble.playerId);
+    if (!plane?.alive) continue;
+    const lines = wrapChatText(bubble.text);
+    if (!lines.length) continue;
+
+    context.save();
+    context.font = gameFont(9);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.globalAlpha = Math.min(1, Math.max(0, (bubble.expiresAt - frameTime) / 600));
+
+    const width = Math.min(
+      224,
+      Math.max(64, ...lines.map((line) => Math.ceil(context.measureText(line).width) + 20)),
+    );
+    const height = lines.length * 14 + 12;
+    const abovePlane = plane.y > height + 64;
+    const x = clamp(plane.x - width / 2, 7, WORLD_WIDTH - width - 7);
+    const y = abovePlane
+      ? plane.y - height - 45
+      : Math.min(WORLD_HEIGHT - height - 8, plane.y + 34);
+    const tailX = clamp(plane.x, x + 12, x + width - 12);
+
+    context.fillStyle = "#17131f";
+    context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+    context.fillStyle = "#fffdf8";
+    context.fillRect(Math.round(x + 3), Math.round(y + 3), Math.round(width - 6), Math.round(height - 6));
+
+    if (abovePlane) {
+      context.fillStyle = "#17131f";
+      context.fillRect(Math.round(tailX - 5), Math.round(y + height), 10, 8);
+      context.fillStyle = "#fffdf8";
+      context.fillRect(Math.round(tailX - 2), Math.round(y + height), 4, 4);
+    } else {
+      context.fillStyle = "#17131f";
+      context.fillRect(Math.round(tailX - 5), Math.round(y - 8), 10, 8);
+      context.fillStyle = "#fffdf8";
+      context.fillRect(Math.round(tailX - 2), Math.round(y - 4), 4, 4);
+    }
+
+    context.fillStyle = "#17131f";
+    lines.forEach((line, index) => {
+      const lineY = y + 9 + index * 14;
+      context.fillText(line, x + width / 2, lineY);
+    });
+    context.restore();
+  }
+}
+
 function captureBursts(state: GameState, frameTime: number) {
   for (const event of state.events) {
     if (event.id <= lastEventId) continue;
@@ -164,6 +232,10 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
 function gameFont(size: number) {
   const family = getComputedStyle(document.body).fontFamily;
   return `${size}px ${family}`;
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 export function pilotReadout(state: GameState, pilotId: string) {

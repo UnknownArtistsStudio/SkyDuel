@@ -34,12 +34,13 @@ test("renders the finished Sky Duel game shell", async () => {
 });
 
 test("keeps the original-style flight, pixel display, and multiplayer promises", async () => {
-  const [component, core, renderer, styles, layout, peerRoom, packageJson] = await Promise.all([
+  const [component, core, renderer, styles, layout, pagesShell, peerRoom, packageJson] = await Promise.all([
     readFile(new URL("../app/game/SkyDuel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/game-core.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/render-game.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
     readFile(new URL("../app/game/peer-room.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
@@ -52,7 +53,12 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /FIRST TO/);
   assert.match(component, /pixelExplosion/);
   assert.match(component, /pixelGunshot/);
-  assert.match(component, /active \? 0\.0045/);
+  assert.match(component, /talking \? 0\.0007 : 0\.0045/);
+  assert.match(component, /webkitSpeechRecognition/);
+  assert.match(component, /TRANSMITTING/);
+  assert.match(component, /chat-request/);
+  assert.match(component, /ArcadeControls/);
+  assert.match(component, /MESSAGE &gt;/);
   assert.match(core, /MAX_PLAYERS = 6/);
   assert.match(core, /matchMode/);
   assert.match(core, /scoreLimit/);
@@ -61,6 +67,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /RECOVERY_SPEED = 102/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);
   assert.match(renderer, /drawPixelCloud/);
+  assert.match(renderer, /drawSpeechBubbles/);
   assert.match(renderer, /#9b90f4/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
   assert.doesNotMatch(renderer, /ui-monospace|SFMono|Menlo/);
@@ -68,6 +75,11 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(styles, /border-radius|box-shadow|text-shadow|rgba\(|gradient/i);
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyDuelPixel"/);
+  assert.match(styles, /\.arcade-controls/);
+  assert.match(styles, /safe-area-inset-bottom/);
+  assert.match(styles, /pointer: coarse/);
+  assert.match(layout, /viewportFit: "cover"/);
+  assert.match(pagesShell, /viewport-fit=cover/);
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));

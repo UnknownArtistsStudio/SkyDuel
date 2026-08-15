@@ -25,6 +25,7 @@ body {
   min-height: 100%;
   margin: 0;
   background: var(--black);
+  overscroll-behavior: none;
 }
 
 body,
@@ -434,11 +435,73 @@ strong {
   font-size: 7px;
 }
 
-.touch-controls {
+.radio-status {
+  position: absolute;
+  bottom: 38px;
+  left: 50%;
+  color: var(--black);
+  font-size: 6px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.radio-status.is-transmitting {
+  color: var(--red);
+  animation: warning 0.5s steps(2, end) infinite;
+}
+
+.chat-composer {
+  position: absolute;
+  right: 13px;
+  bottom: 36px;
+  left: 13px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 7px;
+}
+
+.chat-composer label {
+  display: flex;
+  align-items: center;
+  width: min(500px, 76%);
+  padding: 5px;
+  color: var(--white);
+  background: var(--black);
+}
+
+.chat-composer input {
+  min-width: 0;
+  flex: 1;
+  padding: 0 0 0 8px;
+  border: 0;
+  outline: 0;
+  color: var(--orange);
+  background: var(--black);
+  text-transform: uppercase;
+}
+
+.chat-composer button {
+  padding: 5px 7px;
+  color: var(--orange);
+  background: var(--black);
+}
+
+.chat-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.arcade-controls {
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
   .game-root {
     padding: 0;
   }
@@ -446,6 +509,7 @@ strong {
   .game-screen {
     width: 100%;
     min-height: 100svh;
+    min-height: 100dvh;
     aspect-ratio: auto;
     outline: 0;
   }
@@ -507,7 +571,7 @@ strong {
   }
 
   .flight-readout {
-    bottom: 70px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
     gap: 7px;
     font-size: 5px;
   }
@@ -516,26 +580,110 @@ strong {
     display: none;
   }
 
-  .touch-controls {
-    position: absolute;
-    right: 11px;
-    bottom: 12px;
-    left: 11px;
-    display: grid;
-    grid-template-columns: 1fr 1.35fr 1fr;
-    gap: 9px;
+  .radio-status {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
   }
 
-  .touch-controls button {
-    min-height: 46px;
+  .chat-composer {
+    right: calc(env(safe-area-inset-right, 0px) + 9px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+    left: calc(env(safe-area-inset-left, 0px) + 9px);
+    font-size: 6px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .screen-playing .game-screen {
+    touch-action: none;
+  }
+
+  .arcade-controls {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: block;
+    pointer-events: none;
+  }
+
+  .arcade-stick {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 11px);
+    left: calc(env(safe-area-inset-left, 0px) + 12px);
+    width: 104px;
+    height: 54px;
+    padding: 0;
     color: var(--black);
-    font-size: 8px;
+    opacity: 0.52;
+    pointer-events: auto;
     text-align: center;
     touch-action: none;
     user-select: none;
   }
 
-  .touch-controls .touch-fire {
+  .stick-rail {
+    position: absolute;
+    top: 19px;
+    left: 10px;
+    width: 84px;
+    height: 8px;
+    background: var(--black);
+  }
+
+  .stick-knob {
+    position: absolute;
+    top: 10px;
+    left: 43px;
+    width: 18px;
+    height: 26px;
+    background: var(--orange);
+    transform: translateX(var(--stick-x));
+  }
+
+  .stick-label {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    font-size: 6px;
+  }
+
+  .arcade-actions {
+    position: absolute;
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    display: flex;
+    gap: 10px;
+    pointer-events: auto;
+  }
+
+  .arcade-button {
+    width: 55px;
+    height: 52px;
+    padding: 0;
+    color: var(--white);
+    background: var(--black);
+    font-size: 7px;
+    opacity: 0.52;
+    text-align: center;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .arcade-button[aria-pressed="true"],
+  .arcade-stick:active {
+    opacity: 0.88;
+  }
+
+  .arcade-button:disabled,
+  .arcade-stick:disabled {
+    opacity: 0.2;
+  }
+
+  .talk-button {
+    color: var(--orange);
+  }
+
+  .fire-button {
     color: var(--red);
   }
 }
