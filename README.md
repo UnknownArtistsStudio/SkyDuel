@@ -5,7 +5,7 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 ## Play
 
 - Press **Start** on the pixel title screen to enable game audio and open the game menu.
-- **A / D** or **arrow keys** rotate the aircraft. Press both turn directions together to perform one precisely timed barrel roll; release either direction before rolling again. Bullets and missiles pass through the aircraft during the roll.
+- **A / D** or **arrow keys** rotate the aircraft. Press both turn directions together to perform one precisely timed barrel roll. Bullets and missiles pass through the aircraft during the roll, followed by a short recharge beat before another dodge is possible.
 - **Space** fires the forward gun. Each magazine holds three shots, followed by a short automatic reload.
 - Hold **T** and speak to send a radio-filtered voice clip of up to three seconds plus a short message above your aircraft. Press **Enter** for the typed fallback. Clips and messages are transmitted directly to the room, disappear after playback, and are not stored.
 - When bomb pickups are enabled, fly through the bomb hidden in a drifting cloud, then press **B** to drop it. The blast can take out several opponents at once; the pilot who dropped it and teammates are safe from its blast.
@@ -14,7 +14,7 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 - A flashing respawn is completely protected: it cannot fire, be hit, or collide until the flashing ends.
 - On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. Tap the middle of the stick to barrel roll. A **Bomb** or **Missile** button appears only while carrying that special weapon. The controls stay at the screen edges and respect phone safe areas.
 
-After **Press Start**, an original slow, dark 1980s-style synth-pad score plays through the setup screens. During a match it becomes a much quieter ambient pad bed, with individual pilot fanfares for kills and short dramatic cues for bomb pickups, missile awards, rolls, reloads, launches, and impacts. Browsers require the first button press before they allow music to begin.
+**Press Start** enables the original slow, dark 1980s-style synth-pad score. The title holds briefly so the opening pad is heard, then the same music carries continuously through the game settings and joining screens. During a match it becomes a much quieter ambient pad bed, with individual pilot fanfares for kills and short dramatic cues for bomb pickups, missile awards, rolls, reloads, launches, and impacts. Browsers require that first button press before they allow music to begin.
 
 ## Match types
 
