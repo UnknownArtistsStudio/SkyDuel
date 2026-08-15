@@ -40,6 +40,13 @@ type NetworkMessage =
   | { type: "voice-request"; clip: VoiceClipPayload }
   | { type: "voice"; playerId: string; clip: VoiceClipPayload };
 type EngineSound = { oscillator: OscillatorNode; gain: GainNode };
+type MusicMode = "silent" | "menu" | "game";
+type MusicSound = {
+  master: GainNode | null;
+  mode: MusicMode;
+  nextBeatAt: number;
+  step: number;
+};
 type QueuedVoiceClip = VoiceClipPayload & { playerId: string; pilotName: string };
 type SpeechRecognitionAlternativeLike = { transcript: string };
 type SpeechRecognitionResultLike = {
@@ -76,7 +83,7 @@ declare global {
   }
 }
 
-const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false };
+const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: false };
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
 
@@ -90,6 +97,7 @@ export function SkyDuel() {
   const lastSoundEventRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
   const engineSoundRef = useRef<EngineSound | null>(null);
+  const musicSoundRef = useRef<MusicSound>({ master: null, mode: "silent", nextBeatAt: 0, step: 0 });
   const chatBubblesRef = useRef<ChatBubble[]>([]);
   const chatRateRef = useRef(new Map<string, number>());
   const voiceRateRef = useRef(new Map<string, number>());
@@ -128,7 +136,19 @@ export function SkyDuel() {
     bombsEnabled: boolean;
     winner: GameState["winner"];
   }>({
-    readout: { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0, bombs: 0 },
+    readout: {
+      speed: 0,
+      altitude: 0,
+      stalled: false,
+      protected: false,
+      rolling: false,
+      alive: false,
+      respawnIn: 0,
+      bombs: 0,
+      missiles: 0,
+      shotsRemaining: 0,
+      reloadIn: 0,
+    },
     pilots: [],
     scoreLimit: 10,
     bombsEnabled: false,
@@ -661,19 +681,30 @@ export function SkyDuel() {
     inputRef.current = { ...inputRef.current, bomb: true };
   }, []);
 
+  const rollArcadePlane = useCallback(() => {
+    void audioRef.current?.resume();
+    inputRef.current = { ...inputRef.current, roll: true };
+  }, []);
+
   useEffect(() => {
     if (chatInputOpen) chatInputRef.current?.focus();
   }, [chatInputOpen]);
 
   useEffect(() => {
     const keys = new Set<string>();
+    let rollArmed = true;
     const refreshInput = () => {
       const left = ["a", "arrowleft", "w", "arrowup"].some((key) => keys.has(key));
       const right = ["d", "arrowright", "s", "arrowdown"].some((key) => keys.has(key));
+      const rollingChord = left && right;
+      const triggerRoll = rollingChord && rollArmed;
+      if (triggerRoll) rollArmed = false;
+      if (!rollingChord) rollArmed = true;
       inputRef.current = {
         turn: left === right ? 0 : left ? -1 : 1,
         fire: keys.has(" "),
         bomb: inputRef.current.bomb,
+        roll: inputRef.current.roll || triggerRoll,
       };
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -720,6 +751,7 @@ export function SkyDuel() {
     const onBlur = () => {
       keys.clear();
       refreshInput();
+      inputRef.current = { ...inputRef.current, roll: false };
       stopTalking();
     };
     window.addEventListener("keydown", onKeyDown);
@@ -752,20 +784,20 @@ export function SkyDuel() {
           [localIdRef.current]: inputRef.current,
           "practice-rival": botInput(state, "practice-rival"),
         }, dt);
-        inputRef.current = { ...inputRef.current, bomb: false };
+        inputRef.current = { ...inputRef.current, bomb: false, roll: false };
       } else if (mode === "host") {
         stepGame(state, {
           ...remoteInputsRef.current,
           [localIdRef.current]: inputRef.current,
         }, dt);
-        inputRef.current = { ...inputRef.current, bomb: false };
+        inputRef.current = { ...inputRef.current, bomb: false, roll: false };
         if (time - lastBroadcast > 66) {
           roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
           lastBroadcast = time;
         }
       } else if (mode === "guest" && time - lastBroadcast > 45) {
         roomRef.current?.sendToHost({ type: "input", input: inputRef.current } satisfies NetworkMessage);
-        inputRef.current = { ...inputRef.current, bomb: false };
+        inputRef.current = { ...inputRef.current, bomb: false, roll: false };
         lastBroadcast = time;
       }
 
@@ -779,6 +811,12 @@ export function SkyDuel() {
         engineSoundRef.current,
         localPlane,
         screen === "playing" && !state.winner,
+        isTalkingRef.current || voicePlayingRef.current,
+      );
+      updateMusic(
+        audioRef.current,
+        musicSoundRef.current,
+        screen,
         isTalkingRef.current || voicePlayingRef.current,
       );
       playNewSounds(state, lastSoundEventRef, audioRef);
@@ -873,9 +911,15 @@ export function SkyDuel() {
                   ? "SAFE / GUNS OFF"
                   : readout.stalled
                     ? "STALL / NOSE DOWN"
-                    : readout.bombs > 0
-                      ? "BOMB READY / B DROP"
-                      : "A D TURN / SPACE FIRE / T TALK"}
+                    : readout.rolling
+                      ? "BARREL ROLL"
+                      : readout.missiles > 0
+                        ? "MISSILE READY / B FIRE"
+                        : readout.bombs > 0
+                          ? "BOMB READY / B DROP"
+                          : readout.reloadIn > 0
+                            ? `GUN RELOAD ${readout.reloadIn.toFixed(1)}`
+                            : `GUN ${readout.shotsRemaining}/3 / A+D ROLL`}
               </span>
               <span>ALT <strong>{readout.altitude}</strong></span>
             </div>
@@ -940,8 +984,9 @@ export function SkyDuel() {
             <ArcadeControls
               disabled={!readout.alive || Boolean(winner)}
               isTalking={isTalking}
-              hasBomb={readout.bombs > 0}
+              specialWeapon={readout.missiles > 0 ? "MISSILE" : readout.bombs > 0 ? "BOMB" : null}
               onTurn={setArcadeTurn}
+              onRoll={rollArcadePlane}
               onFire={setArcadeFire}
               onBomb={dropArcadeBomb}
               onTalkStart={startTalking}
@@ -1048,8 +1093,9 @@ export function SkyDuel() {
 function ArcadeControls({
   disabled,
   isTalking,
-  hasBomb,
+  specialWeapon,
   onTurn,
+  onRoll,
   onFire,
   onBomb,
   onTalkStart,
@@ -1057,22 +1103,28 @@ function ArcadeControls({
 }: {
   disabled: boolean;
   isTalking: boolean;
-  hasBomb: boolean;
+  specialWeapon: "MISSILE" | "BOMB" | null;
   onTurn: (turn: -1 | 0 | 1) => void;
+  onRoll: () => void;
   onFire: (fire: boolean) => void;
   onBomb: () => void;
   onTalkStart: () => void;
   onTalkEnd: () => void;
 }) {
   const stickPointerRef = useRef<number | null>(null);
+  const stickMovedRef = useRef(false);
   const [stickX, setStickX] = useState(0);
   const [firing, setFiring] = useState(false);
 
   const releaseStick = useCallback(() => {
+    if (stickPointerRef.current === null) return;
+    const shouldRoll = !stickMovedRef.current && !disabled;
     stickPointerRef.current = null;
+    stickMovedRef.current = false;
     setStickX(0);
     onTurn(0);
-  }, [onTurn]);
+    if (shouldRoll) onRoll();
+  }, [disabled, onRoll, onTurn]);
 
   const moveStick = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (stickPointerRef.current !== event.pointerId) return;
@@ -1080,6 +1132,7 @@ function ArcadeControls({
     const bounds = event.currentTarget.getBoundingClientRect();
     const travel = Math.min(28, bounds.width * 0.28);
     const offset = Math.max(-travel, Math.min(travel, event.clientX - bounds.left - bounds.width / 2));
+    if (Math.abs(offset) > 7) stickMovedRef.current = true;
     setStickX(offset);
     onTurn(offset < -7 ? -1 : offset > 7 ? 1 : 0);
   }, [onTurn]);
@@ -1097,6 +1150,7 @@ function ArcadeControls({
           if (disabled) return;
           event.preventDefault();
           stickPointerRef.current = event.pointerId;
+          stickMovedRef.current = false;
           event.currentTarget.setPointerCapture(event.pointerId);
           moveStick(event);
         }}
@@ -1107,7 +1161,7 @@ function ArcadeControls({
       >
         <span className="stick-rail" />
         <span className="stick-knob" />
-        <span className="stick-label">TURN</span>
+        <span className="stick-label">TURN / ROLL</span>
       </button>
 
       <div className="arcade-actions">
@@ -1130,12 +1184,12 @@ function ArcadeControls({
         >
           TALK
         </button>
-        {hasBomb && (
+        {specialWeapon && (
           <button
             className="arcade-button bomb-button"
             type="button"
             disabled={disabled}
-            aria-label="Drop bomb"
+            aria-label={specialWeapon === "MISSILE" ? "Launch missile" : "Drop bomb"}
             onContextMenu={(event) => event.preventDefault()}
             onPointerDown={(event) => {
               if (disabled) return;
@@ -1143,7 +1197,7 @@ function ArcadeControls({
               onBomb();
             }}
           >
-            BOMB
+            {specialWeapon}
           </button>
         )}
         <button
@@ -1251,6 +1305,7 @@ function sanitizeInput(input: PilotInput): PilotInput {
     turn: input?.turn === -1 || input?.turn === 1 ? input.turn : 0,
     fire: Boolean(input?.fire),
     bomb: Boolean(input?.bomb),
+    roll: Boolean(input?.roll),
   };
 }
 
@@ -1295,6 +1350,99 @@ function updateEngineSound(
   engine.gain.gain.setTargetAtTime(active ? activeVolume : 0.0001, context.currentTime, 0.06);
 }
 
+function updateMusic(
+  context: AudioContext | null,
+  music: MusicSound,
+  screen: Screen,
+  ducked: boolean,
+) {
+  if (!context) return;
+  if (!music.master) {
+    music.master = context.createGain();
+    music.master.gain.value = 0.0001;
+    music.master.connect(context.destination);
+  }
+
+  const nextMode: MusicMode = screen === "playing" ? "game" : screen === "title" ? "silent" : "menu";
+  if (music.mode !== nextMode) {
+    music.mode = nextMode;
+    music.step = 0;
+    music.nextBeatAt = context.currentTime + 0.04;
+  }
+  const fullVolume = nextMode === "menu" ? 0.52 : nextMode === "game" ? 0.35 : 0.0001;
+  music.master.gain.setTargetAtTime(ducked ? 0.045 : fullVolume, context.currentTime, 0.08);
+  if (nextMode === "silent") return;
+
+  const beatLength = nextMode === "menu" ? 0.19 : 0.32;
+  while (music.nextBeatAt < context.currentTime + 0.2) {
+    if (nextMode === "menu") scheduleMenuBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
+    else scheduleGameBeat(context, music.master, music.step, music.nextBeatAt, beatLength);
+    music.step = (music.step + 1) % 16;
+    music.nextBeatAt += beatLength;
+  }
+}
+
+function scheduleMenuBeat(
+  context: AudioContext,
+  destination: AudioNode,
+  step: number,
+  start: number,
+  beat: number,
+) {
+  const roots = [146.83, 123.47, 98, 110];
+  const root = roots[Math.floor(step / 4)];
+  const melody = [
+    293.66, 369.99, 440, 329.63,
+    246.94, 329.63, 415.3, 293.66,
+    196, 293.66, 392, 261.63,
+    220, 329.63, 440, 369.99,
+  ];
+  if (step % 2 === 0) scheduleMusicTone(context, destination, root, start, beat * 0.9, 0.035);
+  scheduleMusicTone(context, destination, melody[step], start, beat * 0.62, 0.026);
+  if (step === 0 || step === 8) scheduleMusicTone(context, destination, 48, start, 0.045, 0.045);
+}
+
+function scheduleGameBeat(
+  context: AudioContext,
+  destination: AudioNode,
+  step: number,
+  start: number,
+  beat: number,
+) {
+  const chordRoots = [110, 98, 123.47, 92.5];
+  const chord = Math.floor(step / 4);
+  const root = chordRoots[chord];
+  if (step % 4 === 0) {
+    scheduleMusicTone(context, destination, root, start, beat * 3.65, 0.021);
+    scheduleMusicTone(context, destination, root * 1.5, start, beat * 3.65, 0.012);
+    scheduleMusicTone(context, destination, root * 2, start, beat * 3.65, 0.009);
+  }
+  if (step === 2 || step === 6 || step === 10 || step === 14) {
+    scheduleMusicTone(context, destination, root * 2, start, beat * 0.42, 0.01);
+  }
+}
+
+function scheduleMusicTone(
+  context: AudioContext,
+  destination: AudioNode,
+  frequency: number,
+  start: number,
+  duration: number,
+  volume: number,
+) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "square";
+  oscillator.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.012);
+  gain.gain.setValueAtTime(volume, Math.max(start + 0.013, start + duration - 0.035));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain).connect(destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
+}
+
 function playNewSounds(
   state: GameState,
   lastEventRef: React.MutableRefObject<number>,
@@ -1306,15 +1454,84 @@ function playNewSounds(
     if (event.id <= lastEventRef.current) continue;
     lastEventRef.current = event.id;
     if (event.type === "shot") pixelGunshot(context);
+    if (event.type === "reload") pixelReload(context);
+    if (event.type === "roll") pixelRoll(context);
     if (event.type === "crash") pixelExplosion(context);
+    if (event.type === "score") {
+      const pilot = state.players.find((candidate) => candidate.id === event.playerId);
+      heroicFanfare(context, pilot?.spawnIndex ?? 0);
+    }
     if (event.type === "stall") tone(context, 120, 0.12, "triangle", 0.025);
     if (event.type === "bomb-pickup") {
-      tone(context, 640, 0.08, "square", 0.04);
-      tone(context, 920, 0.12, "square", 0.025);
+      suspenseFanfare(context);
     }
     if (event.type === "bomb-drop") tone(context, 150, 0.13, "square", 0.035);
     if (event.type === "bomb-explosion") pixelBombExplosion(context);
+    if (event.type === "missile-award") missileAwardFanfare(context);
+    if (event.type === "missile-launch") pixelMissileLaunch(context);
+    if (event.type === "missile-hit") pixelMissileHit(context);
   }
+}
+
+function heroicFanfare(context: AudioContext, pilotIndex: number) {
+  const roots = [261.63, 293.66, 329.63, 349.23, 392, 440];
+  const patterns = [
+    [1, 1.5, 2, 2.5],
+    [1, 1.333, 2, 2.667],
+    [1, 1.25, 1.875, 2.5],
+    [1, 1.5, 1.75, 2.25],
+    [1, 1.2, 1.6, 2.4],
+    [1, 1.333, 1.667, 2.667],
+  ];
+  const index = Math.abs(pilotIndex) % roots.length;
+  const start = context.currentTime;
+  patterns[index].forEach((multiple, note) => {
+    scheduleEffectTone(context, roots[index] * multiple, start + note * 0.075, note === 3 ? 0.24 : 0.09, 0.032);
+  });
+}
+
+function suspenseFanfare(context: AudioContext) {
+  const start = context.currentTime;
+  [220, 233.08, 185, 164.81].forEach((frequency, index) => {
+    scheduleEffectTone(context, frequency, start + index * 0.105, index === 3 ? 0.3 : 0.13, 0.032);
+  });
+}
+
+function missileAwardFanfare(context: AudioContext) {
+  const start = context.currentTime;
+  [329.63, 493.88, 659.25, 987.77].forEach((frequency, index) => {
+    scheduleEffectTone(context, frequency, start + index * 0.055, index === 3 ? 0.24 : 0.08, 0.035);
+  });
+}
+
+function pixelReload(context: AudioContext) {
+  scheduleEffectTone(context, 105, context.currentTime, 0.035, 0.025);
+  scheduleEffectTone(context, 150, context.currentTime + 1.16, 0.045, 0.022);
+  scheduleEffectTone(context, 225, context.currentTime + 1.22, 0.055, 0.02);
+}
+
+function pixelRoll(context: AudioContext) {
+  sweptTone(context, 740, 185, 0.34, "square", 0.022);
+}
+
+function pixelMissileLaunch(context: AudioContext) {
+  sweptTone(context, 115, 72, 0.18, "square", 0.028);
+  window.setTimeout(() => sweptTone(context, 260, 780, 0.28, "sawtooth", 0.035), 190);
+}
+
+function pixelMissileHit(context: AudioContext) {
+  pixelExplosion(context);
+  tone(context, 180, 0.16, "square", 0.027);
+}
+
+function scheduleEffectTone(
+  context: AudioContext,
+  frequency: number,
+  start: number,
+  duration: number,
+  volume: number,
+) {
+  scheduleMusicTone(context, context.destination, frequency, start, duration, volume);
 }
 
 function pixelBombExplosion(context: AudioContext) {
@@ -1370,11 +1587,22 @@ function pixelGunshot(context: AudioContext) {
 }
 
 function tone(context: AudioContext, frequency: number, duration: number, type: OscillatorType, volume: number) {
+  sweptTone(context, frequency, Math.max(30, frequency * 0.55), duration, type, volume);
+}
+
+function sweptTone(
+  context: AudioContext,
+  startFrequency: number,
+  endFrequency: number,
+  duration: number,
+  type: OscillatorType,
+  volume: number,
+) {
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = type;
-  oscillator.frequency.setValueAtTime(frequency, context.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, frequency * 0.55), context.currentTime + duration);
+  oscillator.frequency.setValueAtTime(startFrequency, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(30, endFrequency), context.currentTime + duration);
   gain.gain.setValueAtTime(volume, context.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
   oscillator.connect(gain).connect(context.destination);

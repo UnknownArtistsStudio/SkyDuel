@@ -3,6 +3,7 @@ import {
   cloudPosition,
   groundY,
   planeSpeed,
+  ROLL_DURATION,
   WORLD_HEIGHT,
   WORLD_WIDTH,
   type GameState,
@@ -10,7 +11,7 @@ import {
 } from "../../lib/game-core";
 import { wrapChatText } from "../../lib/chat";
 
-type Burst = { x: number; y: number; born: number; color: string; kind: "plane" | "bomb" };
+type Burst = { x: number; y: number; born: number; color: string; kind: "plane" | "bomb" | "missile" };
 export type ChatBubble = { playerId: string; text: string; expiresAt: number };
 
 const bursts = new Map<number, Burst>();
@@ -43,6 +44,7 @@ export function renderGame(
   drawBombPowerUps(context, state);
   drawTerrain(context);
   drawBombs(context, state);
+  drawMissiles(context, state);
   drawBullets(context, state);
   captureBursts(state, frameTime);
   drawBursts(context, frameTime);
@@ -134,11 +136,39 @@ function drawBombs(context: CanvasRenderingContext2D, state: GameState) {
   }
 }
 
+function drawMissiles(context: CanvasRenderingContext2D, state: GameState) {
+  for (const missile of state.missiles) {
+    context.save();
+    context.translate(Math.round(missile.x), Math.round(missile.y));
+    context.rotate(missile.boosted ? missile.angle : Math.atan2(missile.vy, missile.vx || 1));
+    if (missile.boosted) {
+      context.fillStyle = "#fffdf8";
+      for (let index = 1; index <= 5; index += 1) {
+        const size = Math.max(2, 7 - index);
+        context.globalAlpha = 1 - index * 0.13;
+        context.fillRect(-15 - index * 8, -Math.ceil(size / 2), 7, size);
+      }
+      context.globalAlpha = 1;
+      context.fillStyle = "#f2a913";
+      context.fillRect(-13, -4, 6, 8);
+    }
+    context.fillStyle = "#17131f";
+    context.fillRect(-8, -4, 18, 8);
+    context.fillRect(-7, -7, 5, 14);
+    context.fillStyle = "#fffdf8";
+    context.fillRect(7, -2, 5, 4);
+    context.restore();
+  }
+}
+
 function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: boolean, time: number) {
   context.save();
   context.translate(plane.x, plane.y);
   context.rotate(plane.angle);
-  context.scale(1, plane.liftSide);
+  const rollScale = plane.rollFor > 0
+    ? Math.max(0.12, Math.abs(Math.cos((plane.rollFor / ROLL_DURATION) * Math.PI * 2)))
+    : 1;
+  context.scale(1, plane.liftSide * rollScale);
   if (plane.invulnerableFor > 0 && Math.floor(time * 8) % 2 === 0) context.globalAlpha = 0.35;
   context.fillStyle = plane.color;
   context.fillRect(-18, -3, 34, 7);
@@ -168,6 +198,10 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
     context.font = gameFont(9);
     context.fillStyle = "#fffdf8";
     context.fillText("STALL", plane.x, plane.y - 38);
+  } else if (plane.rollFor > 0) {
+    context.font = gameFont(9);
+    context.fillStyle = "#fffdf8";
+    context.fillText("ROLL", plane.x, plane.y - 38);
   }
   context.restore();
 }
@@ -250,6 +284,16 @@ function captureBursts(state: GameState, frameTime: number) {
       });
       continue;
     }
+    if (event.type === "missile-hit" && event.x !== undefined && event.y !== undefined) {
+      bursts.set(event.id, {
+        x: event.x,
+        y: event.y,
+        born: frameTime,
+        color: "#fffdf8",
+        kind: "missile",
+      });
+      continue;
+    }
     if (event.type === "crash") {
       const plane = state.players.find((candidate) => candidate.id === event.playerId);
       if (plane) {
@@ -268,7 +312,7 @@ function captureBursts(state: GameState, frameTime: number) {
 function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
   for (const [id, burst] of bursts) {
     const age = (frameTime - burst.born) / 1000;
-    const duration = burst.kind === "bomb" ? 1 : 0.8;
+    const duration = burst.kind === "bomb" ? 1 : burst.kind === "missile" ? 0.55 : 0.8;
     if (age > duration) {
       bursts.delete(id);
       continue;
@@ -277,13 +321,13 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
     context.save();
     context.translate(burst.x, burst.y);
     context.globalAlpha = 1 - progress;
-    const count = burst.kind === "bomb" ? 16 : 8;
+    const count = burst.kind === "bomb" ? 16 : burst.kind === "missile" ? 10 : 8;
     for (let index = 0; index < count; index += 1) {
       const angle = (index / count) * Math.PI * 2;
-      const spread = burst.kind === "bomb" ? 108 : 18 + (index % 2) * 10;
+      const spread = burst.kind === "bomb" ? 108 : burst.kind === "missile" ? 46 : 18 + (index % 2) * 10;
       const radius = 5 + progress * spread;
       context.fillStyle = index % 3 === 0 ? "#17131f" : index % 2 === 0 ? "#f2a913" : burst.color;
-      const size = burst.kind === "bomb" ? 12 : 8;
+      const size = burst.kind === "bomb" ? 12 : burst.kind === "missile" ? 7 : 8;
       context.fillRect(
         Math.round(Math.cos(angle) * radius) - size / 2,
         Math.round(Math.sin(angle) * radius) - size / 2,
@@ -307,15 +351,31 @@ function clamp(value: number, minimum: number, maximum: number) {
 export function pilotReadout(state: GameState, pilotId: string) {
   const plane = state.players.find((candidate) => candidate.id === pilotId);
   if (!plane) {
-    return { speed: 0, altitude: 0, stalled: false, protected: false, alive: false, respawnIn: 0, bombs: 0 };
+    return {
+      speed: 0,
+      altitude: 0,
+      stalled: false,
+      protected: false,
+      rolling: false,
+      alive: false,
+      respawnIn: 0,
+      bombs: 0,
+      missiles: 0,
+      shotsRemaining: 0,
+      reloadIn: 0,
+    };
   }
   return {
     speed: Math.round(planeSpeed(plane)),
     altitude: Math.max(0, Math.round(groundY(plane.x) - plane.y)),
     stalled: plane.stalled,
     protected: plane.invulnerableFor > 0,
+    rolling: plane.rollFor > 0,
     alive: plane.alive,
     respawnIn: Math.max(0, plane.respawnIn),
     bombs: plane.bombs,
+    missiles: plane.missiles,
+    shotsRemaining: plane.shotsRemaining,
+    reloadIn: Math.max(0, plane.reloadIn),
   };
 }

@@ -63,6 +63,11 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /voice-request/);
   assert.match(component, /BOMB PICKUPS/);
   assert.match(component, /RADIO SENT/);
+  assert.match(component, /A\+D ROLL/);
+  assert.match(component, /MISSILE READY/);
+  assert.match(component, /scheduleMenuBeat/);
+  assert.match(component, /scheduleGameBeat/);
+  assert.match(component, /heroicFanfare/);
   assert.match(core, /MAX_PLAYERS = 6/);
   assert.match(core, /matchMode/);
   assert.match(core, /scoreLimit/);
@@ -71,12 +76,16 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /RECOVERY_SPEED = 102/);
   assert.match(core, /BOMB_BLAST_RADIUS = 132/);
   assert.match(core, /bombPowerUps/);
+  assert.match(core, /MAGAZINE_SIZE = 3/);
+  assert.match(core, /ROLL_DURATION/);
+  assert.match(core, /missileLeadAwarded/);
   assert.match(core, /cloudPosition/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);
   assert.match(renderer, /drawPixelCloud/);
   assert.match(renderer, /drawSpeechBubbles/);
   assert.match(renderer, /drawBombPowerUps/);
   assert.match(renderer, /drawBombs/);
+  assert.match(renderer, /drawMissiles/);
   assert.match(renderer, /#9b90f4/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
   assert.doesNotMatch(renderer, /ui-monospace|SFMono|Menlo/);
