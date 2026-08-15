@@ -95,19 +95,23 @@ function drawPixelCloud(context: CanvasRenderingContext2D, x: number, y: number,
 }
 
 function drawTerrain(context: CanvasRenderingContext2D, state: GameState) {
-  const fill = state.landscape === "tower" ? "#f2a913" : "#17131f";
+  const fill = state.landscape === "tower" ? "#f2a913" : state.landscape === "sea" ? "#2478cf" : "#17131f";
   for (let x = 0; x < WORLD_WIDTH; x += 12) {
     const surface = groundY(x + 6, state.landscape);
     context.fillStyle = fill;
     context.fillRect(x, surface, 12, WORLD_HEIGHT - surface);
-    context.fillStyle = state.landscape === "mountains" ? "#f2a913" : "#17131f";
-    context.fillRect(x, surface, 12, 6);
+    if (state.landscape !== "sea") {
+      context.fillStyle = state.landscape === "mountains" ? "#f2a913" : "#17131f";
+      context.fillRect(x, surface, 12, 6);
+    }
   }
   if (state.landscape === "sea") {
     context.fillStyle = "#fffdf8";
-    for (let x = 8; x < WORLD_WIDTH; x += 48) {
-      const offset = Math.floor(x / 48) % 2 === 0 ? 0 : 5;
-      context.fillRect(x, 604 + offset, 20, 3);
+    const drift = Math.floor(state.time * 7) % 48;
+    for (let x = -48 + drift; x < WORLD_WIDTH; x += 48) {
+      const offset = Math.floor((x - drift) / 48) % 2 === 0 ? 0 : 5;
+      context.fillRect(x, 601 + offset, 24, 4);
+      context.fillRect(x + 8, 597 + offset, 12, 4);
     }
     return;
   }
@@ -136,7 +140,7 @@ function drawBullets(context: CanvasRenderingContext2D, state: GameState) {
 function drawPilotBullets(context: CanvasRenderingContext2D, state: GameState) {
   context.fillStyle = "#fffdf8";
   for (const bullet of state.pilotBullets) {
-    context.fillRect(Math.round(bullet.x) - 1, Math.round(bullet.y) - 4, 3, 7);
+    context.fillRect(Math.round(bullet.x) - 1, Math.round(bullet.y) - 1, 2, 2);
   }
 }
 
@@ -164,8 +168,9 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
   for (const pilot of state.groundPilots) {
     const owner = state.players.find((plane) => plane.id === pilot.ownerId);
     const color = owner?.color ?? "#f02b10";
+    const sinkDepth = pilot.wreck ? Math.max(0, Math.min(10, ((pilot.strandedFor ?? 0) - 3) * 5)) : 0;
     context.save();
-    context.translate(Math.round(pilot.x), Math.round(pilot.y));
+    context.translate(Math.round(pilot.x), Math.round(pilot.y + sinkDepth));
     if (pilot.invulnerableFor > 0 && Math.floor(state.time * 10) % 2 === 0) context.globalAlpha = 0.35;
     if (pilot.wreck) {
       context.fillStyle = color;
@@ -188,7 +193,9 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
     context.fillStyle = color;
     context.fillRect(-5, -3, 10, 11);
     context.fillStyle = "#17131f";
-    context.fillRect(3, -5, 11, 3);
+    const aim = pilot.aim ?? 0;
+    if (aim === 0) context.fillRect(-1, -17, 3, 10);
+    else context.fillRect(aim > 0 ? 3 : -14, -6, 11, 3);
     context.fillRect(-7, 8, 5, 7);
     context.fillRect(2, 8, 5, 7);
     if (pilot.ownerId === viewerId) {
@@ -442,7 +449,7 @@ function captureBursts(state: GameState, frameTime: number) {
       }
       continue;
     }
-    if (event.type === "sea-crash" && event.x !== undefined && event.y !== undefined) {
+    if ((event.type === "sea-crash" || event.type === "sea-sink") && event.x !== undefined && event.y !== undefined) {
       bursts.set(event.id, {
         x: event.x,
         y: event.y,
@@ -481,7 +488,7 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
     context.save();
     context.translate(burst.x, burst.y);
     context.globalAlpha = 1 - progress;
-    const count = burst.kind === "bomb" ? 16 : burst.kind === "missile" ? 10 : burst.kind === "vapor" ? 12 : burst.kind === "splash" ? 12 : 8;
+    const count = burst.kind === "bomb" ? 16 : burst.kind === "missile" ? 10 : burst.kind === "vapor" ? 12 : burst.kind === "splash" ? 18 : 8;
     for (let index = 0; index < count; index += 1) {
       const angle = (index / count) * Math.PI * 2;
       const spread = burst.kind === "bomb" ? 108 : burst.kind === "missile" ? 46 : burst.kind === "vapor" ? 58 : burst.kind === "splash" ? 64 : 18 + (index % 2) * 10;
@@ -489,8 +496,10 @@ function drawBursts(context: CanvasRenderingContext2D, frameTime: number) {
       const vaporY = burst.kind === "vapor" ? -progress * 54 : 0;
       const splashY = burst.kind === "splash" ? -Math.abs(Math.sin(angle)) * progress * 72 : 0;
       const radius = 5 + progress * spread;
-      context.fillStyle = index % 3 === 0 ? "#17131f" : index % 2 === 0 ? "#f2a913" : burst.color;
-      const size = burst.kind === "bomb" ? 12 : burst.kind === "missile" ? 7 : burst.kind === "vapor" ? 5 : 8;
+      context.fillStyle = burst.kind === "splash"
+        ? index % 2 === 0 ? "#fffdf8" : "#2478cf"
+        : index % 3 === 0 ? "#17131f" : index % 2 === 0 ? "#f2a913" : burst.color;
+      const size = burst.kind === "bomb" ? 12 : burst.kind === "missile" ? 7 : burst.kind === "vapor" ? 5 : burst.kind === "splash" ? 6 : 8;
       context.fillRect(
         Math.round(Math.cos(angle) * radius) - size / 2,
         Math.round(Math.sin(angle) * radius + launchedY + vaporY + splashY) - size / 2,

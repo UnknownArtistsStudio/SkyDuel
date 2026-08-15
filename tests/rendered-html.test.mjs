@@ -82,12 +82,13 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /PLANE DAMAGE/);
   assert.match(component, /REVENGE PILOT/);
   assert.match(component, /6 PILOT HITS = 1 PLANE HIT/);
+  assert.match(component, /FIRE SHOOTS UP OR SIDEWAYS/);
   assert.match(component, /3 HIT MODE \/ DAMAGED \/ SMOKE \/ EXPLODE/);
   assert.match(component, /LANDSCAPE/);
   assert.match(component, /MOUNTAINS/);
-  assert.match(component, /PIXEL PILOT/);
-  assert.match(component, /PixelFaceEditor/);
-  assert.match(component, /PixelPortrait/);
+  assert.match(component, /YOUR PILOT/);
+  assert.match(component, /callsign-preview/);
+  assert.doesNotMatch(component, /PIXEL PILOT|PixelFaceEditor|PixelPortrait/);
   assert.match(component, /scheduleMenuBeat/);
   assert.match(component, /scheduleGameBeat/);
   assert.match(component, /scheduleActionBeat/);
@@ -108,6 +109,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /missileMilestones/);
   assert.match(core, /cloudPosition/);
   assert.match(core, /PILOT_GUN_HITS = 6/);
+  assert.match(core, /SEA_WRECK_SINK_TIME = 5/);
   assert.match(core, /GroundPilot/);
   assert.match(core, /revengePowerUp/);
   assert.match(core, /revengeSpawned/);
@@ -115,6 +117,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /landscape/);
   assert.match(core, /planeInCloud/);
   assert.match(core, /pilot-vaporized/);
+  assert.match(core, /sea-sink/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);
   assert.match(renderer, /drawPixelCloud/);
   assert.match(renderer, /drawSpeechBubbles/);
@@ -128,6 +131,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
   assert.match(renderer, /#9b90f4/);
+  assert.match(renderer, /#2478cf/);
+  assert.match(renderer, /Math\.round\(bullet\.x\) - 1, Math\.round\(bullet\.y\) - 1, 2, 2/);
   assert.doesNotMatch(renderer, /createLinearGradient|drawVignette/);
   assert.doesNotMatch(renderer, /ui-monospace|SFMono|Menlo/);
   assert.match(styles, /--purple: #9b90f4/);
@@ -135,8 +140,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyDuelPixel"/);
   assert.match(styles, /\.arcade-controls/);
-  assert.match(styles, /\.face-editor/);
-  assert.match(styles, /\.pixel-portrait/);
+  assert.match(styles, /\.callsign-preview/);
+  assert.doesNotMatch(styles, /\.face-editor|\.pixel-portrait/);
   assert.match(styles, /\.pilot-lineup/);
   assert.doesNotMatch(styles, /chat-composer/);
   assert.match(styles, /safe-area-inset-bottom/);

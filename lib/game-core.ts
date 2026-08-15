@@ -11,15 +11,7 @@ export const ROLL_DURATION = 0.58;
 export const ROLL_RECHARGE = 1.35;
 export const MISSILE_DROP_TIME = 0.42;
 export const PILOT_GUN_HITS = 6;
-export const DEFAULT_FACE =
-  "00111100" +
-  "01111110" +
-  "01011010" +
-  "01111110" +
-  "01000010" +
-  "01011010" +
-  "00111100" +
-  "00000000";
+export const SEA_WRECK_SINK_TIME = 5;
 
 export type MatchMode = "free-for-all" | "teams";
 export type Team = 0 | 1;
@@ -84,7 +76,6 @@ export type Plane = {
   damage: number;
   pilotDamage: number;
   parachutes: number;
-  face: string;
   joinedAt: number;
 };
 
@@ -126,6 +117,8 @@ export type GroundPilot = {
   vy: number;
   falling: boolean;
   wreck: boolean;
+  strandedFor: number;
+  aim: -1 | 0 | 1;
   fireCooldown: number;
   invulnerableFor: number;
 };
@@ -161,6 +154,7 @@ export type GameEvent = {
     | "roll"
     | "crash"
     | "sea-crash"
+    | "sea-sink"
     | "score"
     | "stall"
     | "recover"
@@ -269,13 +263,12 @@ export function addPlayer(
   id: string,
   name: string,
   teamPreference: TeamPreference = "auto",
-  face: string = DEFAULT_FACE,
 ): Plane {
   const used = new Set(state.players.map((player) => player.spawnIndex));
   const spawnIndex = SPAWNS.findIndex((_, index) => !used.has(index));
   const index = spawnIndex >= 0 ? spawnIndex : state.players.length % SPAWNS.length;
   const team = chooseTeam(state, teamPreference);
-  const plane = makePlane(id, cleanName(name), index, team, cleanFace(face), state.time, state.landscape);
+  const plane = makePlane(id, cleanName(name), index, team, state.time, state.landscape);
   state.players.push(plane);
   return plane;
 }
@@ -294,7 +287,6 @@ function makePlane(
   name: string,
   spawnIndex: number,
   team: Team | null,
-  face: string,
   joinedAt: number,
   landscape: Landscape,
 ): Plane {
@@ -329,7 +321,6 @@ function makePlane(
     damage: 0,
     pilotDamage: 0,
     parachutes: 0,
-    face,
     joinedAt,
   };
 }
@@ -347,19 +338,21 @@ export function cleanName(name: string): string {
   return cleaned || "PILOT";
 }
 
-export function cleanFace(face: unknown): string {
-  if (typeof face !== "string") return DEFAULT_FACE;
-  const pixels = face.replace(/[^01]/g, "");
-  return pixels.length === 64 ? pixels : DEFAULT_FACE;
-}
-
 export function groundY(x: number, landscape: Landscape = "tower"): number {
   const wrappedX = ((x % WORLD_WIDTH) + WORLD_WIDTH) % WORLD_WIDTH;
   if (landscape === "sea") return 598;
   if (landscape === "mountains") {
-    const firstPeak = Math.max(0, 1 - Math.abs(wrappedX - 260) / 230) * 285;
-    const secondPeak = Math.max(0, 1 - Math.abs(wrappedX - 900) / 270) * 250;
-    return 620 - Math.round(Math.max(firstPeak, secondPeak) / 12) * 12;
+    const peaks = [
+      { x: 155, width: 115, height: 76 },
+      { x: 410, width: 150, height: 118 },
+      { x: 705, width: 92, height: 62 },
+      { x: 1015, width: 138, height: 96 },
+    ];
+    const height = peaks.reduce((highest, peak) => {
+      const slope = Math.max(0, 1 - Math.abs(wrappedX - peak.x) / peak.width);
+      return Math.max(highest, slope * peak.height);
+    }, 0);
+    return 620 - Math.round(height / 8) * 8;
   }
   if (wrappedX < 150 || wrappedX > 1050) return 598;
   if (wrappedX < 275 || wrappedX > 925) return 610;
@@ -653,6 +646,9 @@ function updateRevengePowerUp(state: GameState) {
 }
 
 function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>, dt: number) {
+  const seaWreckCount = state.landscape === "sea"
+    ? state.groundPilots.filter((pilot) => pilot.wreck).length
+    : 0;
   for (const pilot of state.groundPilots) {
     const input = inputs[pilot.ownerId] ?? { turn: 0, fire: false, bomb: false, roll: false };
     pilot.invulnerableFor = Math.max(0, pilot.invulnerableFor - dt);
@@ -675,21 +671,41 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
       pilot.x += input.turn * speed * dt;
       pilot.y = groundY(pilot.x, state.landscape) - 7;
     }
+    pilot.strandedFor = pilot.wreck && seaWreckCount >= 2
+      ? (pilot.strandedFor ?? 0) + dt
+      : 0;
     if (pilot.x < 0) pilot.x += WORLD_WIDTH;
     if (pilot.x > WORLD_WIDTH) pilot.x -= WORLD_WIDTH;
     if (input.fire && pilot.fireCooldown <= 0) firePilotGun(state, pilot, input.turn);
+  }
+
+  const sinkingPilots = state.groundPilots.filter(
+    (pilot) => pilot.wreck && (pilot.strandedFor ?? 0) >= SEA_WRECK_SINK_TIME,
+  );
+  if (sinkingPilots.length > 0) {
+    const sinkingIds = new Set(sinkingPilots.map((pilot) => pilot.ownerId));
+    for (const pilot of sinkingPilots) {
+      const plane = state.players.find((candidate) => candidate.id === pilot.ownerId);
+      if (plane) plane.respawnIn = 0.85;
+      pushEvent(state, "sea-sink", pilot.ownerId, undefined, pilot.x, pilot.y);
+    }
+    state.groundPilots = state.groundPilots.filter((pilot) => !sinkingIds.has(pilot.ownerId));
+    state.pilotBullets = state.pilotBullets.filter((bullet) => !sinkingIds.has(bullet.ownerId));
   }
 }
 
 function firePilotGun(state: GameState, pilot: GroundPilot, turn: -1 | 0 | 1) {
   pilot.fireCooldown = 0.16;
+  pilot.aim = turn;
+  const horizontalSpeed = turn * 330;
+  const verticalSpeed = turn === 0 ? -325 : 0;
   state.pilotBullets.push({
     id: state.nextPilotBulletId++,
     ownerId: pilot.ownerId,
-    x: pilot.x + turn * 3,
-    y: pilot.y - 11,
-    vx: turn * 58,
-    vy: -315,
+    x: pilot.x + turn * 7,
+    y: pilot.y - (turn === 0 ? 10 : 4),
+    vx: horizontalSpeed,
+    vy: verticalSpeed,
     life: 1.65,
   });
   pushEvent(state, "pilot-gun", pilot.ownerId, undefined, pilot.x, pilot.y);
@@ -720,6 +736,20 @@ function updatePilotBullets(state: GameState, dt: number) {
       }
       hit = true;
       break;
+    }
+    if (!hit) {
+      const struckPilot = state.groundPilots.find((pilot) => {
+        if (pilot.ownerId === bullet.ownerId || pilot.invulnerableFor > 0) return false;
+        const target = state.players.find((plane) => plane.id === pilot.ownerId);
+        if (shooter && target && areTeammates(state, shooter, target)) return false;
+        const dx = wrappedDistance(bullet.x, pilot.x);
+        const dy = bullet.y - pilot.y;
+        return dx * dx + dy * dy < 7 * 7;
+      });
+      if (struckPilot) {
+        destroyGroundPilot(state, struckPilot, "pilot-shot", bullet.ownerId);
+        hit = true;
+      }
     }
     if (!hit) survivors.push(bullet);
   }
@@ -1013,6 +1043,8 @@ function destroyPlane(
       vy: seaWreck ? 0 : Math.max(18, impactVy * 0.08),
       falling: !seaWreck,
       wreck: seaWreck,
+      strandedFor: 0,
+      aim: 0,
       fireCooldown: 0,
       invulnerableFor: 0.3,
     });
