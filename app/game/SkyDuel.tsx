@@ -1064,6 +1064,12 @@ export function SkyDuel() {
                 {matchMode === "teams" && (
                   <TeamPicker value={teamPreference} onChange={setTeamPreference} />
                 )}
+                <p className="menu-intro" aria-label="Radio chat instructions">
+                  RADIO CHAT / ALLOW MIC FIRST TIME<br />
+                  HOLD T + SPEAK / RELEASE TO SEND / 3 SEC MAX<br />
+                  PHONE: HOLD TALK / ENTER: TYPE MESSAGE<br />
+                  FRIENDS HEAR RADIO VOICE / WORDS APPEAR WHEN SUPPORTED / NOT STORED
+                </p>
                 <div className="menu-actions">
                   <button type="button" onClick={beginPractice}>1 PRACTICE</button>
                   <button type="button" onClick={createRoom}>2 CREATE ROOM</button>
