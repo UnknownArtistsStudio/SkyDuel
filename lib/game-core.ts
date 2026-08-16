@@ -19,6 +19,7 @@ export type TeamPreference = Team | "auto";
 export type ScoreLimit = 5 | 10 | 20 | null;
 export type PlaneHits = 1 | 3;
 export type Landscape = "tower" | "sea" | "mountains";
+export type ComputerCount = 0 | 1 | 2 | 3 | 4 | 5;
 export type GameWinner =
   | { kind: "pilot"; playerId: string }
   | { kind: "team"; team: Team };
@@ -168,6 +169,7 @@ export type GameEvent = {
     | "pilot-bombed"
     | "pilot-vaporized"
     | "pilot-gun"
+    | "pilot-quit"
     | "victory";
   playerId: string;
   targetId?: string;
@@ -199,6 +201,7 @@ export type GameState = {
   parachuteMode: boolean;
   planeHits: PlaneHits;
   landscape: Landscape;
+  computerCount: ComputerCount;
   winner: GameWinner | null;
 };
 
@@ -221,6 +224,7 @@ export function createGame(
   parachuteMode = true,
   planeHits: PlaneHits = 1,
   landscape: Landscape = "tower",
+  computerCount: ComputerCount = 0,
 ): GameState {
   return {
     time: 0,
@@ -245,6 +249,7 @@ export function createGame(
     parachuteMode,
     planeHits,
     landscape,
+    computerCount,
     winner: null,
   };
 }
@@ -271,6 +276,53 @@ export function removePlayer(state: GameState, id: string) {
   state.missiles = state.missiles.filter((missile) => missile.ownerId !== id);
   state.groundPilots = state.groundPilots.filter((pilot) => pilot.ownerId !== id);
   state.pilotBullets = state.pilotBullets.filter((bullet) => bullet.ownerId !== id);
+}
+
+export function isComputerPlayerId(id: string) {
+  return /^computer-[1-5]$/.test(id);
+}
+
+export function reserveHumanSlot(state: GameState, preference: TeamPreference = "auto") {
+  if (state.players.length < MAX_PLAYERS) return true;
+  const computers = state.players.filter((player) => isComputerPlayerId(player.id));
+  if (computers.length === 0) return false;
+  let computer = computers.at(-1);
+  if (state.matchMode === "teams") {
+    const red = state.players.filter((player) => player.team === 0).length;
+    const green = state.players.filter((player) => player.team === 1).length;
+    const expectedTeam = preference === "auto" ? (red <= green ? 0 : 1) : preference;
+    computer = computers.find((player) => player.team === expectedTeam) ?? computer;
+  }
+  if (computer) removePlayer(state, computer.id);
+  return true;
+}
+
+export function syncComputerPlayers(state: GameState) {
+  const humanCount = state.players.filter((player) => !isComputerPlayerId(player.id)).length;
+  const requested = Math.max(0, Math.min(5, Math.floor(state.computerCount ?? 0)));
+  const target = Math.min(requested, Math.max(0, MAX_PLAYERS - humanCount));
+  let computers = state.players.filter((player) => isComputerPlayerId(player.id));
+  while (computers.length > target) {
+    removePlayer(state, computers.at(-1)!.id);
+    computers = state.players.filter((player) => isComputerPlayerId(player.id));
+  }
+  for (let number = 1; computers.length < target && number <= 5; number += 1) {
+    const id = `computer-${number}`;
+    if (state.players.some((player) => player.id === id)) continue;
+    addPlayer(state, id, `COMP ${number}`, "auto");
+    computers = state.players.filter((player) => isComputerPlayerId(player.id));
+  }
+}
+
+export function quitGroundPilot(state: GameState, playerId: string) {
+  const pilot = state.groundPilots.find((candidate) => candidate.ownerId === playerId);
+  if (!pilot || pilot.falling) return false;
+  state.groundPilots = state.groundPilots.filter((candidate) => candidate !== pilot);
+  state.pilotBullets = state.pilotBullets.filter((bullet) => bullet.ownerId !== playerId);
+  const plane = state.players.find((candidate) => candidate.id === playerId);
+  if (plane) plane.respawnIn = 2.75;
+  pushEvent(state, "pilot-quit", playerId, playerId, pilot.x, pilot.y);
+  return true;
 }
 
 function makePlane(

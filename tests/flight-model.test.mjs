@@ -7,13 +7,18 @@ import {
   cloudPosition,
   createGame,
   groundY,
+  isComputerPlayerId,
   MISSILE_DROP_TIME,
   planeInCloud,
   planeSpeed,
+  quitGroundPilot,
+  removePlayer,
+  reserveHumanSlot,
   resetRound,
   ROLL_RECHARGE,
   SEA_WRECK_SINK_TIME,
   stepGame,
+  syncComputerPlayers,
 } from "../lib/game-core.ts";
 
 const FRAME = 1 / 60;
@@ -469,6 +474,55 @@ test("pilot machine-gun bullets can hit rival ground pilots", () => {
   }
   assert.equal(state.groundPilots.some((groundPilot) => groundPilot.ownerId === target.id), false);
   assert.ok(state.events.some((event) => event.type === "pilot-shot"));
+});
+
+test("computer pilots fill open slots and step aside for human pilots", () => {
+  const state = createGame("free-for-all", 10, false, true, 1, "tower", 5);
+  const host = addPlayer(state, "host", "HOST");
+  syncComputerPlayers(state);
+  assert.equal(state.players.length, 6);
+  assert.equal(state.players.filter((player) => isComputerPlayerId(player.id)).length, 5);
+
+  assert.equal(reserveHumanSlot(state, "auto"), true);
+  const guest = addPlayer(state, "guest", "GUEST");
+  syncComputerPlayers(state);
+  assert.equal(state.players.length, 6);
+  assert.equal(state.players.filter((player) => isComputerPlayerId(player.id)).length, 4);
+  assert.ok(state.players.includes(host));
+  assert.ok(state.players.includes(guest));
+
+  removePlayer(state, guest.id);
+  syncComputerPlayers(state);
+  assert.equal(state.players.length, 6);
+  assert.equal(state.players.filter((player) => isComputerPlayerId(player.id)).length, 5);
+});
+
+test("a grounded pilot can quit and return in an aircraft", () => {
+  const state = createGame();
+  const plane = addPlayer(state, "pilot", "PILOT");
+  plane.alive = false;
+  plane.respawnIn = 99;
+  state.groundPilots.push({
+    ownerId: plane.id,
+    x: 400,
+    y: groundY(400) - 7,
+    vx: 0,
+    vy: 0,
+    falling: true,
+    wreck: false,
+    strandedFor: 0,
+    aimAngle: 0,
+    fireCooldown: 0,
+    invulnerableFor: 0,
+  });
+  assert.equal(quitGroundPilot(state, plane.id), false, "a parachuting pilot quit before landing");
+  state.groundPilots[0].falling = false;
+  assert.equal(quitGroundPilot(state, plane.id), true);
+  assert.equal(state.groundPilots.length, 0);
+  assert.equal(plane.respawnIn, 2.75);
+  assert.ok(state.events.some((event) => event.type === "pilot-quit"));
+  for (let frame = 0; frame < 60; frame += 1) stepGame(state, {}, 0.05);
+  assert.equal(plane.alive, true);
 });
 
 test("an ejected pilot can fire a carried missile from the ground", () => {

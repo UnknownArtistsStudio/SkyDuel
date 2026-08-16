@@ -444,7 +444,7 @@ function captureBursts(state: GameState, frameTime: number) {
       continue;
     }
     if (
-      (event.type === "pilot-shot" || event.type === "pilot-bombed" || event.type === "pilot-vaporized") &&
+      (event.type === "pilot-shot" || event.type === "pilot-bombed" || event.type === "pilot-vaporized" || event.type === "pilot-quit") &&
       event.x !== undefined &&
       event.y !== undefined
     ) {

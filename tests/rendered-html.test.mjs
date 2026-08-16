@@ -68,6 +68,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /MISSILES \/ EVERY 3 KILLS EARNS 1 \/ UNUSED MISSILES STACK/);
   assert.match(component, /GROUND MISSILE \/ AIM LEFT OR RIGHT \/ B FIRES ROCKET/);
   assert.match(component, /PILOT ROCKET READY \/ B FIRE/);
+  assert.match(component, /COMPUTER PILOTS/);
+  assert.match(component, /HUMAN PILOTS TAKE A COMPUTER SLOT WHEN THEY JOIN/);
+  assert.match(component, /QUIT PILOT \/ RESPAWN/);
   assert.match(component, /NOT STORED/);
   assert.doesNotMatch(component, /chatInputOpen|TYPE MESSAGE|ENTER FOR TEXT|ENTER: TYPE MESSAGE|MESSAGE &gt;/);
   assert.match(component, /A\+D ROLL/);
@@ -102,6 +105,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /heroicFanfare/);
   assert.match(component, /victoryFanfare/);
   assert.match(core, /MAX_PLAYERS = 6/);
+  assert.match(core, /syncComputerPlayers/);
+  assert.match(core, /reserveHumanSlot/);
+  assert.match(core, /quitGroundPilot/);
   assert.match(core, /matchMode/);
   assert.match(core, /scoreLimit/);
   assert.match(core, /winner/);
@@ -136,6 +142,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(renderer, /drawRevengePowerUp/);
   assert.match(renderer, /drawGroundPilots/);
   assert.match(renderer, /drawPilotBullets/);
+  assert.match(renderer, /pilot-quit/);
   assert.match(renderer, /Math\.sin\(aimAngle\)/);
   assert.match(renderer, /planeInCloud/);
   assert.match(renderer, /missileTrails/);

@@ -6,10 +6,15 @@ import {
   botInput,
   cleanName,
   createGame,
+  isComputerPlayerId,
   MISSILE_DROP_TIME,
+  quitGroundPilot,
   removePlayer,
+  reserveHumanSlot,
   resetRound,
   stepGame,
+  syncComputerPlayers,
+  type ComputerCount,
   type GameState,
   type Landscape,
   type MatchMode,
@@ -38,6 +43,8 @@ type NetworkMessage =
   | { type: "input"; input: PilotInput }
   | { type: "welcome"; playerId: string; state: GameState }
   | { type: "snapshot"; state: GameState }
+  | { type: "room-full" }
+  | { type: "pilot-quit-request" }
   | { type: "chat-request"; text: string }
   | { type: "chat"; playerId: string; text: string }
   | { type: "voice-request"; clip: VoiceClipPayload }
@@ -130,6 +137,7 @@ export function SkyDuel() {
   const [scoreLimit, setScoreLimit] = useState<ScoreLimit>(10);
   const [bombsEnabled, setBombsEnabled] = useState(false);
   const [parachuteMode, setParachuteMode] = useState(true);
+  const [computerCount, setComputerCount] = useState<ComputerCount>(1);
   const [planeHits, setPlaneHits] = useState<PlaneHits>(1);
   const [landscape, setLandscape] = useState<Landscape>("tower");
   const [teamPreference, setTeamPreference] = useState<TeamPreference>("auto");
@@ -276,6 +284,7 @@ export function SkyDuel() {
     room.onPeerClose = (peerId) => {
       if (role === "host") {
         removePlayer(gameRef.current, peerId);
+        syncComputerPlayers(gameRef.current);
         delete remoteInputsRef.current[peerId];
         chatBubblesRef.current = chatBubblesRef.current.filter((bubble) => bubble.playerId !== peerId);
         chatRateRef.current.delete(peerId);
@@ -294,7 +303,12 @@ export function SkyDuel() {
       if (!incoming || typeof incoming !== "object" || !("type" in incoming)) return;
       if (role === "host" && incoming.type === "hello") {
         if (!gameRef.current.players.some((player) => player.id === peerId)) {
+          if (!reserveHumanSlot(gameRef.current, incoming.teamPreference)) {
+            room.sendTo(peerId, { type: "room-full" } satisfies NetworkMessage);
+            return;
+          }
           addPlayer(gameRef.current, peerId, incoming.name, incoming.teamPreference);
+          syncComputerPlayers(gameRef.current);
         }
         room.sendTo(peerId, {
           type: "welcome",
@@ -305,6 +319,9 @@ export function SkyDuel() {
       }
       if (role === "host" && incoming.type === "input") {
         remoteInputsRef.current[peerId] = sanitizeInput(incoming.input);
+      }
+      if (role === "host" && incoming.type === "pilot-quit-request") {
+        quitGroundPilot(gameRef.current, peerId);
       }
       if (role === "host" && incoming.type === "chat-request") {
         const text = acceptChat(peerId, incoming.text);
@@ -327,6 +344,7 @@ export function SkyDuel() {
         setScoreLimit(incoming.state.scoreLimit);
         setBombsEnabled(incoming.state.bombsEnabled);
         setParachuteMode(incoming.state.parachuteMode ?? true);
+        setComputerCount(incoming.state.computerCount ?? 0);
         setPlaneHits(incoming.state.planeHits ?? 1);
         setLandscape(incoming.state.landscape ?? "tower");
         setMode("guest");
@@ -335,6 +353,13 @@ export function SkyDuel() {
       }
       if (role === "guest" && incoming.type === "snapshot") {
         gameRef.current = incoming.state;
+      }
+      if (role === "guest" && incoming.type === "room-full") {
+        setError("That formation already has six pilots.");
+        void room.close();
+        roomRef.current = null;
+        setMode(null);
+        setScreen("join");
       }
       if (
         role === "guest" &&
@@ -367,10 +392,10 @@ export function SkyDuel() {
   const beginPractice = useCallback(() => {
     void roomRef.current?.close();
     roomRef.current = null;
-    const state = createGame("free-for-all", scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape);
+    const state = createGame("free-for-all", scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape, computerCount);
     const playerId = `pilot-${crypto.randomUUID()}`;
     addPlayer(state, playerId, cleanName(callsign), "auto");
-    addPlayer(state, "practice-rival", "RIVAL");
+    syncComputerPlayers(state);
     gameRef.current = state;
     resetRendererEffects();
     clearChat();
@@ -380,11 +405,11 @@ export function SkyDuel() {
     inputRef.current = { ...neutralInput };
     setMode("practice");
     setRoomCode("");
-    setMessage(`${limitLabel(scoreLimit)} practice duel.`);
+    setMessage(`${limitLabel(scoreLimit)} practice against ${computerCount} computer pilot${computerCount === 1 ? "" : "s"}.`);
     setError("");
     setScreen("playing");
     wakeAudio(audioRef, engineSoundRef);
-  }, [bombsEnabled, callsign, clearChat, landscape, parachuteMode, planeHits, scoreLimit]);
+  }, [bombsEnabled, callsign, clearChat, computerCount, landscape, parachuteMode, planeHits, scoreLimit]);
 
   const createRoom = useCallback(async () => {
     setError("");
@@ -393,8 +418,9 @@ export function SkyDuel() {
     wakeAudio(audioRef, engineSoundRef);
     try {
       const room = await PeerRoom.create(cleanName(callsign));
-      const state = createGame(matchMode, scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape);
+      const state = createGame(matchMode, scoreLimit, bombsEnabled, parachuteMode, planeHits, landscape, computerCount);
       addPlayer(state, room.info.peerId, room.info.name, teamPreference);
+      syncComputerPlayers(state);
       gameRef.current = state;
       resetRendererEffects();
       clearChat();
@@ -411,7 +437,7 @@ export function SkyDuel() {
       setError(reason instanceof Error ? reason.message : "The tower did not answer.");
       setScreen("menu");
     }
-  }, [bombsEnabled, callsign, clearChat, landscape, matchMode, parachuteMode, planeHits, scoreLimit, setupRoom, teamPreference]);
+  }, [bombsEnabled, callsign, clearChat, computerCount, landscape, matchMode, parachuteMode, planeHits, scoreLimit, setupRoom, teamPreference]);
 
   const joinRoom = useCallback(async () => {
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
@@ -479,6 +505,16 @@ export function SkyDuel() {
       roomRef.current?.broadcast({ type: "snapshot", state } satisfies NetworkMessage);
     }
   }, [clearChat, mode]);
+
+  const respawnPilot = useCallback(() => {
+    if (mode === "guest") {
+      roomRef.current?.sendToHost({ type: "pilot-quit-request" } satisfies NetworkMessage);
+    } else {
+      quitGroundPilot(gameRef.current, localIdRef.current);
+    }
+    inputRef.current = { ...neutralInput };
+    flashRadio("PILOT QUIT / RESPAWNING");
+  }, [flashRadio, mode]);
 
   const sendChat = useCallback((value: unknown) => {
     const text = cleanChatText(value);
@@ -804,12 +840,13 @@ export function SkyDuel() {
         stepGame(state, inputs, dt);
       } else if (mode === "practice") {
         stepGame(state, {
+          ...computerInputs(state),
           [localIdRef.current]: inputRef.current,
-          "practice-rival": botInput(state, "practice-rival"),
         }, dt);
         inputRef.current = { ...inputRef.current, bomb: false, roll: false };
       } else if (mode === "host") {
         stepGame(state, {
+          ...computerInputs(state),
           ...remoteInputsRef.current,
           [localIdRef.current]: inputRef.current,
         }, dt);
@@ -1019,6 +1056,12 @@ export function SkyDuel() {
               </div>
             )}
 
+            {!winner && readout.onFoot && !readout.parachuting && (
+              <button className="pilot-respawn-button" type="button" onClick={respawnPilot}>
+                QUIT PILOT / RESPAWN
+              </button>
+            )}
+
             <button className="leave-button" type="button" onClick={leaveGame}>QUIT</button>
 
             <ArcadeControls
@@ -1080,6 +1123,7 @@ export function SkyDuel() {
                   </button>
                 </div>
                 <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
+                <ComputerPicker value={computerCount} onChange={setComputerCount} />
                 <div className="choice-group" role="group" aria-label="Plane damage">
                   <span>PLANE DAMAGE</span>
                   <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
@@ -1131,10 +1175,15 @@ export function SkyDuel() {
                 <p className="menu-intro" aria-label="Missile reward rule">
                   MISSILES / EVERY 3 KILLS EARNS 1 / UNUSED MISSILES STACK
                 </p>
+                <p className="menu-intro" aria-label="Computer pilot rule">
+                  COMPUTER PILOTS / 0-5 / SIX TOTAL PILOTS MAX<br />
+                  HUMAN PILOTS TAKE A COMPUTER SLOT WHEN THEY JOIN
+                </p>
                 <p className="menu-intro" aria-label="Parachute mode rule">
                   PARACHUTE MODE / EVERY WEAPON TAKEDOWN EJECTS THE PILOT<br />
                   ON FOOT / HOLD LEFT OR RIGHT TO ROTATE GUN / FIRE AT ANY ANGLE<br />
                   GROUND MISSILE / AIM LEFT OR RIGHT / B FIRES ROCKET<br />
+                  QUIT PILOT / RETURN TO PLANE AFTER NORMAL RESPAWN<br />
                   PHONE / MOVE STICK LEFT OR RIGHT TO AIM / 6 PILOT HITS = 1 PLANE HIT
                 </p>
                 <p className="menu-intro" aria-label="Three hit damage rule">
@@ -1353,6 +1402,31 @@ function TeamPicker({
   );
 }
 
+function ComputerPicker({
+  value,
+  onChange,
+}: {
+  value: ComputerCount;
+  onChange: (computerCount: ComputerCount) => void;
+}) {
+  const choices: ComputerCount[] = [0, 1, 2, 3, 4, 5];
+  return (
+    <div className="choice-group computer-picker" role="group" aria-label="Computer pilots">
+      <span>COMPUTER PILOTS</span>
+      {choices.map((choice) => (
+        <button
+          key={choice}
+          type="button"
+          aria-pressed={value === choice}
+          onClick={() => onChange(choice)}
+        >
+          {choice}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ScorePicker({
   value,
   onChange,
@@ -1388,6 +1462,14 @@ function makeAttractGame() {
   addPlayer(state, "attract-one", "YELLOW");
   addPlayer(state, "attract-two", "RED");
   return state;
+}
+
+function computerInputs(state: GameState) {
+  const inputs: Record<string, PilotInput> = {};
+  for (const player of state.players) {
+    if (isComputerPlayerId(player.id)) inputs[player.id] = botInput(state, player.id);
+  }
+  return inputs;
 }
 
 function limitLabel(scoreLimit: ScoreLimit) {
@@ -1644,6 +1726,7 @@ function playNewSounds(
     if (event.type === "pilot-shot") pixelExplosion(context);
     if (event.type === "pilot-bombed") pixelBombExplosion(context);
     if (event.type === "pilot-vaporized") sweptTone(context, 940, 90, 0.32, "square", 0.04);
+    if (event.type === "pilot-quit") pixelExplosion(context);
     if (event.type === "victory") victoryFanfare(context);
   }
 }
