@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { drawGameCloud, drawGamePlaneSprite } from "./render-game";
 
 const WIDTH = 768;
 const HEIGHT = 512;
-const PIXEL = 4;
+const MASK_SCALE = 4;
 const SKY = "#9b90f4";
 const WHITE = "#fffdf8";
-const BLACK = "#17131f";
 
 type Point = { x: number; y: number };
 type CloudFlight = {
@@ -21,22 +21,22 @@ type CloudFlight = {
 const FLIGHTS: CloudFlight[] = [
   {
     anchor: { x: 190, y: 148 },
-    controlOne: { x: 42, y: 216 },
-    controlTwo: { x: 96, y: 382 },
+    controlOne: { x: 58, y: 210 },
+    controlTwo: { x: 86, y: 360 },
     color: "#f02b10",
     delay: 0,
   },
   {
     anchor: { x: 438, y: 142 },
-    controlOne: { x: 632, y: 54 },
-    controlTwo: { x: 716, y: 286 },
+    controlOne: { x: 624, y: 64 },
+    controlTwo: { x: 704, y: 278 },
     color: "#00ad38",
     delay: 5.1,
   },
   {
     anchor: { x: 622, y: 150 },
-    controlOne: { x: 728, y: 252 },
-    controlTwo: { x: 520, y: 432 },
+    controlOne: { x: 706, y: 246 },
+    controlTwo: { x: 524, y: 390 },
     color: "#f2a913",
     delay: 10.2,
   },
@@ -71,13 +71,7 @@ export function TitleCloudScene() {
     return () => window.cancelAnimationFrame(animationFrame);
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="title-cloud-scene"
-      aria-hidden="true"
-    />
-  );
+  return <canvas ref={canvasRef} className="title-cloud-scene" aria-hidden="true" />;
 }
 
 function drawIntroFrame(
@@ -88,15 +82,13 @@ function drawIntroFrame(
   context.clearRect(0, 0, WIDTH, HEIGHT);
   context.fillStyle = SKY;
   context.fillRect(0, 0, WIDTH, HEIGHT);
-  drawDepthClouds(context, time);
   context.drawImage(titleLayer, 0, 0);
 
   for (const flight of FLIGHTS) {
     const progress = flightProgress(time, flight.delay);
     if (progress === null) continue;
     drawCloudOpening(context, flight.anchor, progress);
-    drawPlaneTrail(context, flight, progress);
-    drawLoopingPlane(context, flight, progress);
+    drawLoopingGamePlane(context, flight, progress, time);
   }
 }
 
@@ -108,8 +100,8 @@ function drawCloudTitle() {
   if (!context) return layer;
 
   const mask = document.createElement("canvas");
-  mask.width = WIDTH / PIXEL;
-  mask.height = HEIGHT / PIXEL;
+  mask.width = WIDTH / MASK_SCALE;
+  mask.height = HEIGHT / MASK_SCALE;
   const maskContext = mask.getContext("2d", { willReadFrequently: true });
   if (!maskContext) return layer;
   maskContext.font = '22px "SkyWarsPixel"';
@@ -119,29 +111,11 @@ function drawCloudTitle() {
   maskContext.fillText("SKY WARS", mask.width / 2, 47);
 
   const image = maskContext.getImageData(0, 0, mask.width, mask.height);
-  const filled = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return false;
-    return image.data[(y * mask.width + x) * 4 + 3] > 80;
-  };
-
-  context.globalAlpha = 0.24;
-  context.fillStyle = BLACK;
   for (let y = 0; y < mask.height; y += 1) {
     for (let x = 0; x < mask.width; x += 1) {
-      if (filled(x, y)) context.fillRect(x * PIXEL + 7, y * PIXEL + 9, PIXEL, PIXEL);
-    }
-  }
-
-  context.globalAlpha = 1;
-  context.fillStyle = WHITE;
-  for (let y = 0; y < mask.height; y += 1) {
-    for (let x = 0; x < mask.width; x += 1) {
-      if (!filled(x, y)) continue;
-      context.fillRect(x * PIXEL, y * PIXEL, PIXEL, PIXEL);
-      const edge = !filled(x - 1, y) || !filled(x + 1, y) || !filled(x, y - 1) || !filled(x, y + 1);
-      if (edge && cloudHash(x, y) % 11 === 0) {
-        const puff = 4 + (cloudHash(y, x) % 3) * 4;
-        context.fillRect(x * PIXEL - puff / 2, y * PIXEL - puff / 2, puff, puff);
+      const alpha = image.data[(y * mask.width + x) * 4 + 3];
+      if (alpha > 80) {
+        drawGameCloud(context, x * MASK_SCALE - 4, y * MASK_SCALE - 3, 0.1);
       }
     }
   }
@@ -151,36 +125,6 @@ function drawCloudTitle() {
   context.textAlign = "center";
   context.fillText("2-6 PILOTS", WIDTH / 2, 237);
   return layer;
-}
-
-function drawDepthClouds(context: CanvasRenderingContext2D, time: number) {
-  const distantDrift = (time * 3) % (WIDTH + 260);
-  const nearDrift = (time * 7) % (WIDTH + 360);
-
-  context.save();
-  context.globalAlpha = 0.1;
-  drawPixelCloud(context, WIDTH - distantDrift, 310, 0.75, WHITE);
-  drawPixelCloud(context, 330 - distantDrift, 390, 0.5, WHITE);
-  context.globalAlpha = 0.08;
-  drawPixelCloud(context, -170 + nearDrift, 430, 1.4, BLACK);
-  drawPixelCloud(context, 620 - nearDrift, 360, 1.05, BLACK);
-  context.restore();
-}
-
-function drawPixelCloud(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  scale: number,
-  color: string,
-) {
-  const unit = 8 * scale;
-  context.fillStyle = color;
-  context.fillRect(Math.round(x), Math.round(y), Math.round(unit * 9), Math.round(unit * 3));
-  context.fillRect(Math.round(x + unit), Math.round(y - unit), Math.round(unit * 3), Math.round(unit));
-  context.fillRect(Math.round(x + unit * 4), Math.round(y - unit * 2), Math.round(unit * 3), Math.round(unit * 2));
-  context.fillRect(Math.round(x + unit * 7), Math.round(y - unit), Math.round(unit), Math.round(unit));
-  context.fillRect(Math.round(x + unit * 2), Math.round(y + unit * 3), Math.round(unit * 5), Math.round(unit));
 }
 
 function flightProgress(time: number, delay: number) {
@@ -226,71 +170,30 @@ function cubicDirection(flight: CloudFlight, progress: number) {
 }
 
 function drawCloudOpening(context: CanvasRenderingContext2D, anchor: Point, progress: number) {
-  const open = Math.sin(Math.PI * progress);
-  const size = Math.round(4 + open * 11) / 2 * 2;
+  const opening = Math.sin(Math.PI * progress);
+  const width = Math.round(12 + opening * 24);
+  const height = Math.round(8 + opening * 12);
   context.fillStyle = SKY;
-  context.fillRect(Math.round(anchor.x - size), Math.round(anchor.y - size / 2), size * 2, size);
-  if (open > 0.55) {
-    context.fillRect(Math.round(anchor.x - size / 2), Math.round(anchor.y - size), size, size * 2);
-  }
+  context.fillRect(
+    Math.round(anchor.x - width / 2),
+    Math.round(anchor.y - height / 2),
+    width,
+    height,
+  );
 }
 
-function drawPlaneTrail(
+function drawLoopingGamePlane(
   context: CanvasRenderingContext2D,
   flight: CloudFlight,
   progress: number,
-) {
-  context.save();
-  context.fillStyle = WHITE;
-  for (let index = 1; index <= 7; index += 1) {
-    const trailProgress = Math.max(0, progress - index * 0.018);
-    const point = cubicPoint(flight, trailProgress);
-    context.globalAlpha = 0.42 - index * 0.045;
-    const size = index % 3 === 0 ? 4 : 3;
-    context.fillRect(Math.round(point.x), Math.round(point.y), size, size);
-  }
-  context.restore();
-}
-
-function drawLoopingPlane(
-  context: CanvasRenderingContext2D,
-  flight: CloudFlight,
-  progress: number,
+  time: number,
 ) {
   const point = cubicPoint(flight, progress);
-  const direction = cubicDirection(flight, progress);
-  const angle = Math.round(direction / (Math.PI / 12)) * (Math.PI / 12);
-  const depth = 0.62 + Math.sin(Math.PI * progress) * 0.9;
-
-  context.save();
-  context.translate(Math.round(point.x + 5), Math.round(point.y + 7));
-  context.rotate(angle);
-  context.scale(depth, depth);
-  context.globalAlpha = 0.24;
-  drawPlaneShape(context, BLACK, false);
-  context.restore();
-
+  const angle = cubicDirection(flight, progress);
   context.save();
   context.translate(Math.round(point.x), Math.round(point.y));
   context.rotate(angle);
-  context.scale(depth, depth);
-  drawPlaneShape(context, flight.color);
+  context.scale(0.82, 0.82);
+  drawGamePlaneSprite(context, flight.color, time);
   context.restore();
-}
-
-function drawPlaneShape(context: CanvasRenderingContext2D, color: string, drawCockpit = true) {
-  context.fillStyle = color;
-  context.fillRect(-12, -2, 24, 4);
-  context.fillRect(-8, -8, 17, 3);
-  context.fillRect(-6, -5, 15, 8);
-  context.fillRect(-12, -6, 4, 8);
-  context.fillRect(8, -1, 7, 2);
-  if (drawCockpit) {
-    context.fillStyle = WHITE;
-    context.fillRect(2, -4, 3, 3);
-  }
-}
-
-function cloudHash(x: number, y: number) {
-  return Math.abs((x * 73856093) ^ (y * 19349663));
 }

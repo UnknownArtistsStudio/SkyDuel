@@ -136,7 +136,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /pilot-vaporized/);
   assert.match(core, /sea-sink/);
   assert.doesNotMatch(core, /#087bed|#d43bce/);
-  assert.match(renderer, /drawPixelCloud/);
+  assert.match(renderer, /drawGameCloud/);
   assert.match(renderer, /drawSpeechBubbles/);
   assert.match(renderer, /drawBombPowerUps/);
   assert.match(renderer, /drawBombs/);
@@ -150,11 +150,14 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
   assert.match(titleScene, /drawCloudTitle/);
-  assert.match(titleScene, /drawLoopingPlane/);
+  assert.match(titleScene, /drawLoopingGamePlane/);
   assert.match(titleScene, /drawCloudOpening/);
-  assert.match(titleScene, /drawDepthClouds/);
+  assert.match(titleScene, /drawGameCloud/);
+  assert.match(titleScene, /drawGamePlaneSprite/);
   assert.match(titleScene, /cubicPoint/);
   assert.match(titleScene, /prefers-reduced-motion/);
+  assert.match(renderer, /export function drawGameCloud/);
+  assert.match(renderer, /export function drawGamePlaneSprite/);
   assert.match(renderer, /#9b90f4/);
   assert.match(renderer, /#2478cf/);
   assert.match(renderer, /Math\.round\(bullet\.x\) - 1, Math\.round\(bullet\.y\) - 1, 2, 2/);

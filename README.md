@@ -4,7 +4,7 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 
 ## Play
 
-- Press **Start** on the animated title screen to enable game audio and open the game menu. The centred SKY WARS letters are built from pixel clouds while tiny biplanes periodically break out, bank through the foreground, and disappear back into the lettering.
+- Press **Start** on the animated title screen to enable game audio and open the game menu. The centred SKY WARS letters are built with the same pixel-cloud shape used in matches, while the actual game biplanes periodically break out and disappear back into the lettering.
 - **A / D** or **arrow keys** rotate the aircraft. Press both turn directions together to perform one precisely timed barrel roll. Bullets and missiles pass through the aircraft during the roll, followed by a short recharge beat before another dodge is possible.
 - **Space** fires the forward gun. Each magazine holds three shots, followed by a short automatic reload. Rooms can use instant one-hit destruction or three-hit damage, where the aircraft first breaks, then smokes, then explodes.
 - Hold **T** and speak to send a radio-filtered voice clip of up to three seconds. On supported browsers, the spoken words also appear briefly above your aircraft. On mobile, hold **Talk**. Clips and transcriptions are transmitted directly to the room, disappear after playback, and are not stored.

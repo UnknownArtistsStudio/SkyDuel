@@ -80,11 +80,11 @@ function drawSky(context: CanvasRenderingContext2D) {
 function drawClouds(context: CanvasRenderingContext2D, time: number) {
   for (let index = 0; index < CLOUD_COUNT; index += 1) {
     const cloud = cloudPosition(time, index);
-    drawPixelCloud(context, cloud.x, cloud.y, cloud.size);
+    drawGameCloud(context, cloud.x, cloud.y, cloud.size);
   }
 }
 
-function drawPixelCloud(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
+export function drawGameCloud(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const unit = 10 * size;
   context.fillStyle = "#fffdf8";
   context.fillRect(x, y, unit * 8, unit * 4);
@@ -288,21 +288,7 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
       context.fillRect(-25 - drift, smokeY, 6 - (index % 2), 6 - (index % 2));
     }
   }
-  context.fillStyle = plane.color;
-  context.fillRect(-18, -3, 34, 7);
-  context.fillRect(-9, -9, 21, 4);
-  context.fillRect(-10, 7, 22, 4);
-  context.fillRect(-19, -8, 6, 6);
-  context.fillRect(14, -1, 8, 3);
-  context.fillStyle = "#17131f";
-  context.fillRect(-2, -6, 6, 4);
-  context.fillRect(-4, -5, 2, 12);
-  context.fillRect(8, -5, 2, 12);
-  if (plane.damage >= 1) context.fillRect(-15, -3, 8, 7);
-  if (plane.damage >= 2) context.fillRect(4, 7, 8, 4);
-  context.fillStyle = "#fffdf8";
-  const propeller = Math.floor(time * 16) % 2 === 0 ? -8 : -4;
-  context.fillRect(22, propeller, 2, 12);
+  drawGamePlaneSprite(context, plane.color, time, plane.damage);
   context.restore();
 
   context.save();
@@ -324,6 +310,29 @@ function drawPlane(context: CanvasRenderingContext2D, plane: Plane, isViewer: bo
     context.fillText("ROLL", plane.x, plane.y - 38);
   }
   context.restore();
+}
+
+export function drawGamePlaneSprite(
+  context: CanvasRenderingContext2D,
+  color: string,
+  time: number,
+  damage = 0,
+) {
+  context.fillStyle = color;
+  context.fillRect(-18, -3, 34, 7);
+  context.fillRect(-9, -9, 21, 4);
+  context.fillRect(-10, 7, 22, 4);
+  context.fillRect(-19, -8, 6, 6);
+  context.fillRect(14, -1, 8, 3);
+  context.fillStyle = "#17131f";
+  context.fillRect(-2, -6, 6, 4);
+  context.fillRect(-4, -5, 2, 12);
+  context.fillRect(8, -5, 2, 12);
+  if (damage >= 1) context.fillRect(-15, -3, 8, 7);
+  if (damage >= 2) context.fillRect(4, 7, 8, 4);
+  context.fillStyle = "#fffdf8";
+  const propeller = Math.floor(time * 16) % 2 === 0 ? -8 : -4;
+  context.fillRect(22, propeller, 2, 12);
 }
 
 function drawSpeechBubbles(
