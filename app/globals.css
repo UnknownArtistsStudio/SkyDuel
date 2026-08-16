@@ -153,7 +153,7 @@ strong {
 }
 
 .menu-card h1 {
-  margin-bottom: 30px;
+  margin-bottom: 22px;
   color: var(--white);
   font-size: clamp(20px, 3.4vw, 39px);
   line-height: 1.35;
@@ -191,6 +191,22 @@ strong {
   line-height: 1.2;
 }
 
+.setup-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+}
+
+.setup-rules .choice-group {
+  grid-template-columns: 68px repeat(4, minmax(0, 1fr));
+  margin: 4px 0;
+}
+
+.setup-rules .computer-picker {
+  grid-column: 1 / -1;
+  grid-template-columns: 68px repeat(6, minmax(0, 1fr));
+}
+
 .callsign-field span,
 .choice-group > span {
   color: var(--white);
@@ -226,9 +242,9 @@ strong {
 
 .menu-actions {
   display: grid;
-  justify-items: start;
-  gap: 3px;
-  margin-top: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 17px;
 }
 
 .menu-actions button,
@@ -236,6 +252,38 @@ strong {
 .winner-card button {
   color: var(--white);
   font-size: 10px;
+}
+
+.menu-actions button {
+  min-height: 34px;
+  text-align: center;
+}
+
+.menu-actions.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setup-help-button {
+  margin-top: 10px;
+  color: var(--orange);
+  font-size: 8px;
+}
+
+.setup-help {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 5px 12px;
+  margin-top: 7px;
+  font-size: 7px;
+  line-height: 1.6;
+}
+
+.setup-help span {
+  color: var(--white);
+}
+
+.setup-help strong {
+  color: var(--orange);
 }
 
 .menu-actions button:hover,
@@ -534,6 +582,10 @@ strong {
   display: none;
 }
 
+.rotate-phone {
+  display: none;
+}
+
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
   .game-root {
     padding: 0;
@@ -558,7 +610,7 @@ strong {
 
   .hangar-overlay {
     align-items: start;
-    padding: 28px 18px;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
   }
 
   .menu-card {
@@ -566,20 +618,21 @@ strong {
   }
 
   .menu-card h1 {
-    margin-bottom: 22px;
+    margin-bottom: 12px;
   }
 
-  .callsign-field,
-  .choice-group {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .menu-eyebrow {
+    margin-bottom: 7px;
   }
 
-  .computer-picker {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .callsign-field {
+    grid-template-columns: 68px 1fr;
+    gap: 5px;
+    margin: 3px 0;
   }
 
   .callsign-preview {
-    grid-template-columns: 1fr;
+    display: none;
   }
 
   .pilot-lineup {
@@ -587,28 +640,92 @@ strong {
     width: 92%;
   }
 
-  .callsign-field span,
-  .choice-group > span {
-    grid-column: 1 / -1;
-  }
-
   .callsign-field input {
-    grid-column: 1 / -1;
+    grid-column: 2;
+    font-size: 15px;
+    line-height: 1.1;
   }
 
-  .choice-group button {
+  .setup-rules {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .setup-rules .choice-group,
+  .setup-rules .computer-picker {
+    grid-column: auto;
+    grid-template-columns: 68px repeat(6, minmax(0, 1fr));
+    gap: 3px;
+    margin: 1px 0;
+  }
+
+  .setup-rules .choice-group > span {
+    grid-column: auto;
+  }
+
+  .join-card .choice-group {
+    grid-template-columns: 68px repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .join-card .choice-group > span {
+    grid-column: auto;
+  }
+
+  .setup-rules .choice-group button {
+    min-height: 25px;
+    font-size: 6px;
+  }
+
+  .setup-help-button {
+    margin-top: 7px;
+    font-size: 7px;
+  }
+
+  .setup-help {
+    grid-template-columns: 68px 1fr;
+    gap: 3px 8px;
+    margin-top: 4px;
+    font-size: 6px;
+  }
+
+  .menu-actions {
+    gap: 3px;
+    margin-top: 9px;
+  }
+
+  .menu-actions button {
+    min-height: 30px;
     font-size: 7px;
   }
 
   .scoreboard {
-    top: 8px;
-    left: 8px;
-    width: 142px;
+    top: 6px;
+    left: 7px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 10px;
+    width: 230px;
+  }
+
+  .score-row {
+    grid-template-columns: 6px 1fr 8px 16px;
+    gap: 3px;
+    min-height: 13px;
+    font-size: 5px;
+  }
+
+  .pilot-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  .team-score {
+    grid-column: 1 / -1;
+    font-size: 5px;
   }
 
   .game-mode-label {
-    top: 10px;
-    font-size: 5px;
+    display: none;
   }
 
   .room-ticket {
@@ -627,7 +744,7 @@ strong {
   }
 
   .pilot-respawn-button {
-    top: 38px;
+    top: 48px;
     right: 8px;
     font-size: 5px;
   }
@@ -641,6 +758,8 @@ strong {
 @media (hover: none) and (pointer: coarse) {
   .screen-playing .game-screen {
     touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
   }
 
   .arcade-controls {
@@ -655,11 +774,11 @@ strong {
     position: absolute;
     bottom: calc(env(safe-area-inset-bottom, 0px) + 11px);
     left: calc(env(safe-area-inset-left, 0px) + 12px);
-    width: 104px;
-    height: 54px;
+    width: 124px;
+    height: 64px;
     padding: 0;
     color: var(--black);
-    opacity: 0.52;
+    opacity: 0.44;
     pointer-events: auto;
     text-align: center;
     touch-action: none;
@@ -668,9 +787,9 @@ strong {
 
   .stick-rail {
     position: absolute;
-    top: 19px;
+    top: 23px;
     left: 10px;
-    width: 84px;
+    width: 104px;
     height: 8px;
     background: var(--black);
   }
@@ -678,19 +797,19 @@ strong {
   .arcade-stick.is-on-foot::before {
     position: absolute;
     top: 1px;
-    left: 48px;
+    left: 58px;
     width: 8px;
-    height: 44px;
+    height: 52px;
     background: var(--black);
     content: "";
   }
 
   .stick-knob {
     position: absolute;
-    top: 10px;
-    left: 43px;
-    width: 18px;
-    height: 26px;
+    top: 11px;
+    left: 52px;
+    width: 20px;
+    height: 30px;
     background: var(--orange);
     transform: translate(var(--stick-x), var(--stick-y));
   }
@@ -708,18 +827,19 @@ strong {
     right: calc(env(safe-area-inset-right, 0px) + 12px);
     bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
     display: flex;
-    gap: 10px;
+    gap: 6px;
+    align-items: end;
     pointer-events: auto;
   }
 
   .arcade-button {
-    width: 55px;
-    height: 52px;
+    width: 50px;
+    height: 48px;
     padding: 0;
     color: var(--white);
     background: var(--black);
     font-size: 7px;
-    opacity: 0.52;
+    opacity: 0.44;
     text-align: center;
     touch-action: none;
     user-select: none;
@@ -727,7 +847,7 @@ strong {
 
   .arcade-button[aria-pressed="true"],
   .arcade-stick:active {
-    opacity: 0.88;
+    opacity: 0.9;
   }
 
   .arcade-button:disabled,
@@ -744,7 +864,34 @@ strong {
   }
 
   .fire-button {
+    width: 64px;
+    height: 58px;
     color: var(--red);
+    font-size: 8px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .screen-playing .arcade-controls {
+    display: none;
+  }
+
+  .screen-playing .rotate-phone {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    display: grid;
+    place-content: center;
+    gap: 13px;
+    color: var(--black);
+    background: var(--purple);
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .screen-playing .rotate-phone strong {
+    color: var(--orange);
+    font-size: 18px;
   }
 }
 
@@ -757,12 +904,8 @@ strong {
     font-size: 7px;
   }
 
-  .scoreboard {
-    width: 120px;
-  }
-
-  .game-mode-label {
-    display: none;
+  .menu-actions button {
+    font-size: 6px;
   }
 }
 

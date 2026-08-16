@@ -181,6 +181,7 @@ export function SkyDuel() {
   const [isTalking, setIsTalking] = useState(false);
   const [radioMessage, setRadioMessage] = useState("");
   const [lastChatLine, setLastChatLine] = useState("");
+  const [setupHelpOpen, setSetupHelpOpen] = useState(false);
 
   const { readout, pilots, scoreLimit: activeScoreLimit, bombsEnabled: activeBombsEnabled, winner, matchTime } = hud;
   const winningPilots = winner
@@ -1081,6 +1082,11 @@ export function SkyDuel() {
               onTalkEnd={stopTalking}
             />
 
+            <div className="rotate-phone" role="status">
+              <span>TURN PHONE</span>
+              <strong>LANDSCAPE</strong>
+            </div>
+
             <span className="chat-announcer" aria-live="polite">{lastChatLine}</span>
           </>
         )}
@@ -1092,7 +1098,7 @@ export function SkyDuel() {
                 <p className="menu-eyebrow">SKY DUEL / 2-6 PILOTS</p>
                 <h1>GAME?</h1>
                 <label className="callsign-field">
-                  <span>CALL SIGN</span>
+                  <span>NAME</span>
                   <input
                     value={callsign}
                     maxLength={12}
@@ -1105,90 +1111,89 @@ export function SkyDuel() {
                   <span>YOUR PILOT</span>
                   <strong>{cleanName(callsign)}</strong>
                 </div>
-                <div className="choice-group" role="group" aria-label="Room rules">
-                  <span>ROOM RULES</span>
-                  <button
-                    type="button"
-                    aria-pressed={matchMode === "free-for-all"}
-                    onClick={() => setMatchMode("free-for-all")}
-                  >
-                    FREE FOR ALL
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={matchMode === "teams"}
-                    onClick={() => setMatchMode("teams")}
-                  >
-                    TEAMS
-                  </button>
+                <div className="setup-rules">
+                  <div className="choice-group mode-picker" role="group" aria-label="Room rules">
+                    <span>MODE</span>
+                    <button
+                      type="button"
+                      aria-pressed={matchMode === "free-for-all"}
+                      onClick={() => setMatchMode("free-for-all")}
+                    >
+                      ALL
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={matchMode === "teams"}
+                      onClick={() => setMatchMode("teams")}
+                    >
+                      TEAMS
+                    </button>
+                  </div>
+                  <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
+                  <ComputerPicker value={computerCount} onChange={setComputerCount} />
+                  <div className="choice-group damage-picker" role="group" aria-label="Plane damage">
+                    <span>HITS</span>
+                    <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
+                      1
+                    </button>
+                    <button type="button" aria-pressed={planeHits === 3} onClick={() => setPlaneHits(3)}>
+                      3
+                    </button>
+                  </div>
+                  <div className="choice-group landscape-picker" role="group" aria-label="Landscape">
+                    <span>MAP</span>
+                    <button type="button" aria-pressed={landscape === "tower"} onClick={() => setLandscape("tower")}>
+                      TOWER
+                    </button>
+                    <button type="button" aria-pressed={landscape === "sea"} onClick={() => setLandscape("sea")}>
+                      SEA
+                    </button>
+                    <button type="button" aria-pressed={landscape === "mountains"} onClick={() => setLandscape("mountains")}>
+                      PEAKS
+                    </button>
+                  </div>
+                  <div className="choice-group bomb-picker" role="group" aria-label="Bomb power-ups">
+                    <span>BOMBS</span>
+                    <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
+                      OFF
+                    </button>
+                    <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
+                      ON
+                    </button>
+                  </div>
+                  <div className="choice-group eject-picker" role="group" aria-label="Parachute mode">
+                    <span>EJECT</span>
+                    <button type="button" aria-pressed={!parachuteMode} onClick={() => setParachuteMode(false)}>
+                      OFF
+                    </button>
+                    <button type="button" aria-pressed={parachuteMode} onClick={() => setParachuteMode(true)}>
+                      ON
+                    </button>
+                  </div>
+                  {matchMode === "teams" && (
+                    <TeamPicker value={teamPreference} onChange={setTeamPreference} />
+                  )}
                 </div>
-                <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
-                <ComputerPicker value={computerCount} onChange={setComputerCount} />
-                <div className="choice-group" role="group" aria-label="Plane damage">
-                  <span>PLANE DAMAGE</span>
-                  <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
-                    1 HIT
-                  </button>
-                  <button type="button" aria-pressed={planeHits === 3} onClick={() => setPlaneHits(3)}>
-                    3 HITS
-                  </button>
-                </div>
-                <div className="choice-group" role="group" aria-label="Landscape">
-                  <span>LANDSCAPE</span>
-                  <button type="button" aria-pressed={landscape === "tower"} onClick={() => setLandscape("tower")}>
-                    TOWER
-                  </button>
-                  <button type="button" aria-pressed={landscape === "sea"} onClick={() => setLandscape("sea")}>
-                    SEA
-                  </button>
-                  <button type="button" aria-pressed={landscape === "mountains"} onClick={() => setLandscape("mountains")}>
-                    MOUNTAINS
-                  </button>
-                </div>
-                <div className="choice-group" role="group" aria-label="Bomb power-ups">
-                  <span>BOMB PICKUPS</span>
-                  <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
-                    OFF
-                  </button>
-                  <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
-                    ON
-                  </button>
-                </div>
-                <div className="choice-group" role="group" aria-label="Parachute mode">
-                  <span>PARACHUTE MODE</span>
-                  <button type="button" aria-pressed={!parachuteMode} onClick={() => setParachuteMode(false)}>
-                    OFF
-                  </button>
-                  <button type="button" aria-pressed={parachuteMode} onClick={() => setParachuteMode(true)}>
-                    ON
-                  </button>
-                </div>
-                {matchMode === "teams" && (
-                  <TeamPicker value={teamPreference} onChange={setTeamPreference} />
+                <button
+                  className="setup-help-button"
+                  type="button"
+                  aria-expanded={setupHelpOpen}
+                  onClick={() => setSetupHelpOpen((open) => !open)}
+                >
+                  {setupHelpOpen ? "- HIDE CONTROLS" : "+ CONTROLS"}
+                </button>
+                {setupHelpOpen && (
+                  <div className="setup-help" aria-label="Game controls">
+                    <span>FLY</span><strong>A/D OR STICK</strong>
+                    <span>FIRE</span><strong>SPACE OR FIRE</strong>
+                    <span>ROLL</span><strong>A+D OR TAP STICK</strong>
+                    <span>RADIO</span><strong>HOLD T OR TALK</strong>
+                    <span>SPECIAL</span><strong>B OR SPECIAL BUTTON</strong>
+                    <span>REWARD</span><strong>3 KILLS = MISSILE</strong>
+                    <span>ON FOOT</span><strong>AIM + FIRE / B ROCKET</strong>
+                    <span>ROOM</span><strong>6 PILOTS MAX</strong>
+                  </div>
                 )}
-                <p className="menu-intro" aria-label="Radio chat instructions">
-                  RADIO CHAT / ALLOW MIC FIRST TIME<br />
-                  HOLD T + SPEAK / RELEASE TO SEND / 3 SEC MAX<br />
-                  PHONE: HOLD TALK<br />
-                  FRIENDS HEAR RADIO VOICE / WORDS APPEAR WHEN SUPPORTED / NOT STORED
-                </p>
-                <p className="menu-intro" aria-label="Missile reward rule">
-                  MISSILES / EVERY 3 KILLS EARNS 1 / UNUSED MISSILES STACK
-                </p>
-                <p className="menu-intro" aria-label="Computer pilot rule">
-                  COMPUTER PILOTS / 0-5 / SIX TOTAL PILOTS MAX<br />
-                  HUMAN PILOTS TAKE A COMPUTER SLOT WHEN THEY JOIN
-                </p>
-                <p className="menu-intro" aria-label="Parachute mode rule">
-                  PARACHUTE MODE / EVERY WEAPON TAKEDOWN EJECTS THE PILOT<br />
-                  ON FOOT / HOLD LEFT OR RIGHT TO ROTATE GUN / FIRE AT ANY ANGLE<br />
-                  GROUND MISSILE / AIM LEFT OR RIGHT / B FIRES ROCKET<br />
-                  QUIT PILOT / RETURN TO PLANE AFTER NORMAL RESPAWN<br />
-                  PHONE / MOVE STICK LEFT OR RIGHT TO AIM / 6 PILOT HITS = 1 PLANE HIT
-                </p>
-                <p className="menu-intro" aria-label="Three hit damage rule">
-                  3 HIT MODE / DAMAGED / SMOKE / EXPLODE
-                </p>
                 <div className="menu-actions">
                   <button type="button" onClick={beginPractice}>1 PRACTICE</button>
                   <button type="button" onClick={createRoom}>2 CREATE ROOM</button>
@@ -1394,7 +1399,7 @@ function TeamPicker({
 }) {
   return (
     <div className="choice-group team-picker" role="group" aria-label="Team choice">
-      <span>YOUR TEAM</span>
+      <span>TEAM</span>
       <button type="button" aria-pressed={value === "auto"} onClick={() => onChange("auto")}>AUTO</button>
       <button type="button" aria-pressed={value === 0} onClick={() => onChange(0)}>RED</button>
       <button type="button" aria-pressed={value === 1} onClick={() => onChange(1)}>GREEN</button>
@@ -1412,7 +1417,7 @@ function ComputerPicker({
   const choices: ComputerCount[] = [0, 1, 2, 3, 4, 5];
   return (
     <div className="choice-group computer-picker" role="group" aria-label="Computer pilots">
-      <span>COMPUTER PILOTS</span>
+      <span>COMPS</span>
       {choices.map((choice) => (
         <button
           key={choice}
@@ -1438,11 +1443,11 @@ function ScorePicker({
     { value: 5, label: "5" },
     { value: 10, label: "10" },
     { value: 20, label: "20" },
-    { value: null, label: "NO LIMIT" },
+    { value: null, label: "ENDLESS" },
   ];
   return (
     <div className="choice-group score-picker" role="group" aria-label="Winning score">
-      <span>WIN AT</span>
+      <span>WIN</span>
       {choices.map((choice) => (
         <button
           key={choice.label}
