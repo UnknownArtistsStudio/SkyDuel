@@ -35,6 +35,7 @@ import {
 } from "../../lib/radio";
 import { PeerRoom } from "./peer-room";
 import { pilotReadout, renderGame, resetRendererEffects, type ChatBubble } from "./render-game";
+import { TitleCloudScene } from "./title-cloud-scene";
 
 type Screen = "title" | "menu" | "join" | "connecting" | "playing";
 type Mode = "practice" | "host" | "guest" | null;
@@ -945,6 +946,9 @@ export function SkyWars() {
 
         {screen === "title" && (
           <div className="title-screen">
+            <h1 className="title-heading">SKY WARS</h1>
+            <span className="title-subtitle">2-6 PILOTS</span>
+            <TitleCloudScene />
             <button type="button" onClick={pressStart}>PRESS START</button>
           </div>
         )}

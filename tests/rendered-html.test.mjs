@@ -35,10 +35,11 @@ test("renders the finished Sky Wars game shell", async () => {
 });
 
 test("keeps the original-style flight, pixel display, and multiplayer promises", async () => {
-  const [component, core, renderer, styles, layout, pagesShell, peerRoom, packageJson] = await Promise.all([
+  const [component, core, renderer, titleScene, styles, layout, pagesShell, peerRoom, packageJson] = await Promise.all([
     readFile(new URL("../app/game/SkyWars.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/game-core.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/render-game.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/game/title-cloud-scene.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
@@ -48,6 +49,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
 
   assert.match(component, /STALL \/ NOSE DOWN/);
   assert.match(component, /SKY WARS \/ 2-6 PILOTS/);
+  assert.match(component, /TitleCloudScene/);
   assert.doesNotMatch(component, /SKY DUEL/i);
   assert.match(component, /SAFE \/ GUNS OFF/);
   assert.match(component, /FREE FOR ALL/);
@@ -147,6 +149,12 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /planeInCloud/);
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
+  assert.match(titleScene, /drawCloudTitle/);
+  assert.match(titleScene, /drawLoopingPlane/);
+  assert.match(titleScene, /drawCloudOpening/);
+  assert.match(titleScene, /drawDepthClouds/);
+  assert.match(titleScene, /cubicPoint/);
+  assert.match(titleScene, /prefers-reduced-motion/);
   assert.match(renderer, /#9b90f4/);
   assert.match(renderer, /#2478cf/);
   assert.match(renderer, /Math\.round\(bullet\.x\) - 1, Math\.round\(bullet\.y\) - 1, 2, 2/);
@@ -156,6 +164,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(styles, /border-radius|box-shadow|text-shadow|rgba\(|gradient/i);
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyWarsPixel"/);
+  assert.match(styles, /\.title-cloud-scene/);
+  assert.doesNotMatch(styles, /--title-art/);
   assert.match(styles, /\.arcade-controls/);
   assert.match(styles, /--stick-y/);
   assert.match(styles, /\.callsign-preview/);

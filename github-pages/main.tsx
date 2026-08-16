@@ -4,8 +4,6 @@ import { SkyWars } from "../app/game/SkyWars";
 import "../app/globals.css";
 
 window.SKY_WARS_ROOM_ORIGIN = "https://loop-and-lead-duel.latelee.chatgpt.site";
-const titleArt = new URL("./og.png", window.location.href).href;
-document.documentElement.style.setProperty("--title-art", `url("${titleArt}")`);
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Sky Wars could not find its game screen.");
