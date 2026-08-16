@@ -155,6 +155,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(titleScene, /drawGameCloud/);
   assert.match(titleScene, /drawGamePlaneSprite/);
   assert.match(titleScene, /cubicPoint/);
+  assert.match(titleScene, /context\.scale\(0\.41, 0\.41\)/);
+  assert.match(titleScene, /progress < 0\.985 \? progress : null/);
+  assert.doesNotMatch(titleScene, /smoothStep/);
   assert.match(titleScene, /prefers-reduced-motion/);
   assert.match(renderer, /export function drawGameCloud/);
   assert.match(renderer, /export function drawGamePlaneSprite/);

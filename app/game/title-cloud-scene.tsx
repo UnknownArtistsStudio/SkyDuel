@@ -131,13 +131,8 @@ function flightProgress(time: number, delay: number) {
   const cycle = 15.3;
   const phase = ((time + delay) % cycle + cycle) % cycle / cycle;
   if (phase < 0.12 || phase > 0.42) return null;
-  return smoothStep((phase - 0.12) / 0.3);
-}
-
-function smoothStep(value: number) {
-  return value < 0.5
-    ? 4 * value * value * value
-    : 1 - Math.pow(-2 * value + 2, 3) / 2;
+  const progress = (phase - 0.12) / 0.3;
+  return progress < 0.985 ? progress : null;
 }
 
 function cubicPoint(flight: CloudFlight, progress: number) {
@@ -193,7 +188,7 @@ function drawLoopingGamePlane(
   context.save();
   context.translate(Math.round(point.x), Math.round(point.y));
   context.rotate(angle);
-  context.scale(0.82, 0.82);
+  context.scale(0.41, 0.41);
   drawGamePlaneSprite(context, flight.color, time);
   context.restore();
 }
