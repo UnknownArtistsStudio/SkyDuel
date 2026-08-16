@@ -1073,6 +1073,7 @@ export function SkyWars() {
               disabled={!readout.alive || Boolean(winner)}
               isTalking={isTalking}
               pilotOnFoot={readout.onFoot}
+              canRespawn={readout.onFoot && !readout.parachuting}
               specialWeapon={readout.missiles > 0 && (!readout.onFoot || !readout.parachuting)
                 ? "MISSILE"
                 : !readout.onFoot && readout.bombs > 0
@@ -1082,6 +1083,7 @@ export function SkyWars() {
               onRoll={rollArcadePlane}
               onFire={setArcadeFire}
               onBomb={dropArcadeBomb}
+              onRespawn={respawnPilot}
               onTalkStart={startTalking}
               onTalkEnd={stopTalking}
             />
@@ -1249,22 +1251,26 @@ function ArcadeControls({
   disabled,
   isTalking,
   pilotOnFoot,
+  canRespawn,
   specialWeapon,
   onTurn,
   onRoll,
   onFire,
   onBomb,
+  onRespawn,
   onTalkStart,
   onTalkEnd,
 }: {
   disabled: boolean;
   isTalking: boolean;
   pilotOnFoot: boolean;
+  canRespawn: boolean;
   specialWeapon: "MISSILE" | "BOMB" | null;
   onTurn: (turn: -1 | 0 | 1) => void;
   onRoll: () => void;
   onFire: (fire: boolean) => void;
   onBomb: () => void;
+  onRespawn: () => void;
   onTalkStart: () => void;
   onTalkEnd: () => void;
 }) {
@@ -1272,6 +1278,30 @@ function ArcadeControls({
   const stickMovedRef = useRef(false);
   const [stickX, setStickX] = useState(0);
   const [firing, setFiring] = useState(false);
+
+  const releaseControls = useCallback(() => {
+    stickPointerRef.current = null;
+    stickMovedRef.current = false;
+    setStickX(0);
+    setFiring(false);
+    onTurn(0);
+    onFire(false);
+    if (isTalking) onTalkEnd();
+  }, [isTalking, onFire, onTalkEnd, onTurn]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") releaseControls();
+    };
+    window.addEventListener("pagehide", releaseControls);
+    window.addEventListener("blur", releaseControls);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", releaseControls);
+      window.removeEventListener("blur", releaseControls);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [releaseControls]);
 
   const releaseStick = useCallback(() => {
     if (stickPointerRef.current === null) return;
@@ -1325,6 +1355,22 @@ function ArcadeControls({
       </button>
 
       <div className="arcade-actions">
+        {canRespawn && (
+          <button
+            className="arcade-button arcade-respawn-button"
+            type="button"
+            aria-label="Quit ground pilot and respawn in a plane"
+            onContextMenu={(event) => event.preventDefault()}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onRespawn();
+            }}
+          >
+            <span>QUIT</span>
+            <span>RESPAWN</span>
+          </button>
+        )}
         <button
           className="arcade-button talk-button"
           type="button"

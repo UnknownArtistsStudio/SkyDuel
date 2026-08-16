@@ -16,7 +16,7 @@ An original browser homage to early console biplane dogfights. Two to six pilots
 - Callsigns are the pilots' identities: the chosen name is enlarged during setup, match introductions, and the winner display.
 - A normal climb retains plenty of power; a prolonged steep climb still trades speed for altitude. If the aircraft stalls, point the nose down, allow speed to rebuild, then ease back into level flight.
 - A flashing respawn is completely protected: it cannot fire, be hit, or collide until the flashing ends.
-- On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. Tap the middle of the stick to barrel roll. A **Bomb** or **Missile** button appears only while carrying that special weapon. The controls stay at the screen edges and respect phone safe areas.
+- On touch devices in landscape, use the compact arcade stick on the left and hold **Talk** or **Fire** on the right. Tap the middle of the stick to barrel roll. A **Bomb** or **Missile** button appears only while carrying that special weapon, and a dedicated **Quit / Respawn** action appears beside the arcade buttons when a pilot reaches the ground. The controls stay at the screen edges, release safely if the browser is interrupted, and respect phone safe areas.
 
 **Press Start** enables the original slow, dark 1980s-style synth-pad score. The title holds briefly so the opening pad is heard, then the same music carries continuously through the game settings and joining screens. During a match it becomes a quieter ambient pad bed, switches to a fast action cue while a pilot is outside an aircraft, and ends with an intentionally cheerful victory fanfare. Browsers require that first button press before they allow music to begin.
 
