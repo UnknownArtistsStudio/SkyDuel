@@ -2,7 +2,7 @@
 
 declare global {
   interface Window {
-    SKY_DUEL_ROOM_ORIGIN?: string;
+    SKY_WARS_ROOM_ORIGIN?: string;
   }
 }
 
@@ -85,7 +85,7 @@ export class PeerRoom {
     this.peers.clear();
     const body = JSON.stringify({ code: this.info.code, peerId: this.info.peerId });
     const leaveUrl = roomApiUrl("/api/game/leave");
-    if (!window.SKY_DUEL_ROOM_ORIGIN && navigator.sendBeacon) {
+    if (!window.SKY_WARS_ROOM_ORIGIN && navigator.sendBeacon) {
       navigator.sendBeacon(leaveUrl, new Blob([body], { type: "application/json" }));
     } else {
       void fetch(leaveUrl, {
@@ -181,7 +181,7 @@ export class PeerRoom {
     connection.ondatachannel = (event) => this.attachChannel(peerId, event.channel);
 
     if (initiator) {
-      this.attachChannel(peerId, connection.createDataChannel("sky-duel"));
+      this.attachChannel(peerId, connection.createDataChannel("sky-wars"));
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);
       await this.signal(peerId, "offer", offer);
@@ -250,7 +250,7 @@ async function api<T>(path: string, body: unknown): Promise<T> {
 function roomApiUrl(path: string) {
   const origin = typeof window === "undefined"
     ? ""
-    : (window.SKY_DUEL_ROOM_ORIGIN ?? "").replace(/\/$/, "");
+    : (window.SKY_WARS_ROOM_ORIGIN ?? "").replace(/\/$/, "");
   return `${origin}${path}`;
 }
 

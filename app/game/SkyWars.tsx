@@ -98,7 +98,7 @@ const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
 const TITLE_MUSIC_LEAD_IN = 1200;
 
-export function SkyDuel() {
+export function SkyWars() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<GameState>(makeAttractGame());
   const roomRef = useRef<PeerRoom | null>(null);
@@ -940,7 +940,7 @@ export function SkyDuel() {
 
   return (
     <main className={`game-root screen-${screen}`}>
-      <section className="game-screen" aria-label="Sky Duel game">
+      <section className="game-screen" aria-label="Sky Wars game">
         <canvas ref={canvasRef} className="game-canvas" aria-label="Biplane dogfight arena" />
 
         {screen === "title" && (
@@ -1095,7 +1095,7 @@ export function SkyDuel() {
           <div className="hangar-overlay">
             {screen === "menu" && (
               <div className="menu-card">
-                <p className="menu-eyebrow">SKY DUEL / 2-6 PILOTS</p>
+                <p className="menu-eyebrow">SKY WARS / 2-6 PILOTS</p>
                 <h1>GAME?</h1>
                 <label className="callsign-field">
                   <span>NAME</span>

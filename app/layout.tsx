@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "Sky Duel - Browser Biplane Dogfights";
+  const title = "Sky Wars - Browser Biplane Dogfights";
   const description =
     "A fast, stripped-back pixel biplane dogfight for two to six pilots. Climb, lead your shot, and recover from the stall.";
   return {

@@ -1,4 +1,4 @@
-name: Publish Sky Duel
+name: Publish Sky Wars
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Sky Duel
+      - name: Check out Sky Wars
         uses: actions/checkout@v6
       - name: Set up Node
         uses: actions/setup-node@v6

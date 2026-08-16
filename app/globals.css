@@ -1,5 +1,5 @@
 @font-face {
-  font-family: "SkyDuelPixel";
+  font-family: "SkyWarsPixel";
   font-style: normal;
   font-weight: 400;
   font-display: block;
@@ -32,7 +32,7 @@ body,
 button,
 input {
   color: var(--white);
-  font-family: "SkyDuelPixel";
+  font-family: "SkyWarsPixel";
   font-weight: 400;
   font-synthesis: none;
 }

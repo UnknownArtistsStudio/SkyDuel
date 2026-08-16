@@ -1,5 +1,5 @@
-import { SkyDuel } from "./game/SkyDuel";
+import { SkyWars } from "./game/SkyWars";
 
 export default function Home() {
-  return <SkyDuel />;
+  return <SkyWars />;
 }

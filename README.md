@@ -1,4 +1,4 @@
-# Sky Duel
+# Sky Wars
 
 An original browser homage to early console biplane dogfights. Two to six pilots share a flat-colour pixel sky with fast automatic engine power, basic forward guns, momentum, stalls, genuine nose-down recovery, and a growing collection of unexpected match options.
 
@@ -38,7 +38,9 @@ The room creator can add zero to five computer pilots. Practice supports one hum
 
 ## GitHub Pages
 
-The repository includes a separate static build for GitHub Pages. The public Pages version uses the same game and design while sending only room introductions to the public Sky Duel signaling service. Match movement and inputs still travel directly between the players' browsers.
+The repository includes a separate static build for GitHub Pages. The public Pages version uses the same game and design while sending only room introductions to the public Sky Wars signaling service. Match movement and inputs still travel directly between the players' browsers.
+
+Play the public build at **https://unknownartistsstudio.github.io/SkyWars/**.
 
 Every push to `main` runs the Pages deployment workflow. The static build can also be checked locally with `npm run build:pages`.
 
@@ -63,7 +65,7 @@ npx tsc --noEmit
 
 ## Project map
 
-- `app/game/SkyDuel.tsx` — game shell, controls, modes, and match loop
+- `app/game/SkyWars.tsx` — game shell, controls, modes, and match loop
 - `lib/game-core.ts` — shared flight, stall, collision, firing, and scoring rules
 - `app/game/peer-room.ts` — six-player WebRTC room connection
 - `worker/game-api.ts` — room codes and WebRTC signaling

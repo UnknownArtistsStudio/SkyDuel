@@ -19,14 +19,15 @@ async function render() {
   );
 }
 
-test("renders the finished Sky Duel game shell", async () => {
+test("renders the finished Sky Wars game shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Sky Duel - Browser Biplane Dogfights<\/title>/i);
-  assert.match(html, /Sky Duel/);
+  assert.match(html, /<title>Sky Wars - Browser Biplane Dogfights<\/title>/i);
+  assert.match(html, /Sky Wars/);
+  assert.doesNotMatch(html, /Sky Duel/i);
   assert.match(html, /PRESS START/);
   assert.match(html, /Biplane dogfight arena/);
   assert.doesNotMatch(html, /fonts\.googleapis|Geist/i);
@@ -35,7 +36,7 @@ test("renders the finished Sky Duel game shell", async () => {
 
 test("keeps the original-style flight, pixel display, and multiplayer promises", async () => {
   const [component, core, renderer, styles, layout, pagesShell, peerRoom, packageJson] = await Promise.all([
-    readFile(new URL("../app/game/SkyDuel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/game/SkyWars.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/game-core.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/game/render-game.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -46,6 +47,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   ]);
 
   assert.match(component, /STALL \/ NOSE DOWN/);
+  assert.match(component, /SKY WARS \/ 2-6 PILOTS/);
+  assert.doesNotMatch(component, /SKY DUEL/i);
   assert.match(component, /SAFE \/ GUNS OFF/);
   assert.match(component, /FREE FOR ALL/);
   assert.match(component, /TEAMS/);
@@ -152,7 +155,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /--purple: #9b90f4/);
   assert.doesNotMatch(styles, /border-radius|box-shadow|text-shadow|rgba\(|gradient/i);
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
-  assert.match(styles, /font-family: "SkyDuelPixel"/);
+  assert.match(styles, /font-family: "SkyWarsPixel"/);
   assert.match(styles, /\.arcade-controls/);
   assert.match(styles, /--stick-y/);
   assert.match(styles, /\.callsign-preview/);
@@ -166,6 +169,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /\.setup-help/);
   assert.match(layout, /viewportFit: "cover"/);
   assert.match(pagesShell, /viewport-fit=cover/);
+  assert.match(pagesShell, /Sky Wars/);
+  assert.doesNotMatch(pagesShell, /Sky Duel/i);
   assert.match(peerRoom, /RTCPeerConnection/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
