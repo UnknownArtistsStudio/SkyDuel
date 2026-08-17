@@ -175,6 +175,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(layout, /next\/font|Geist|Press_Start_2P/);
   assert.match(styles, /font-family: "SkyWarsPixel"/);
   assert.match(styles, /\.title-cloud-scene/);
+  assert.match(styles, /bottom: 27%/);
   assert.doesNotMatch(styles, /--title-art/);
   assert.match(styles, /\.arcade-controls/);
   assert.match(component, /canRespawn=\{readout\.onFoot && !readout\.parachuting\}/);

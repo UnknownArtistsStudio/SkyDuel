@@ -639,7 +639,7 @@ strong {
 
   .title-screen button {
     position: absolute;
-    bottom: 12%;
+    bottom: 27%;
   }
 
   .hangar-overlay {
@@ -1022,7 +1022,7 @@ strong {
 
   .title-screen button {
     position: absolute;
-    bottom: 12%;
+    bottom: 27%;
   }
 
   .hangar-overlay {
@@ -1166,7 +1166,7 @@ strong {
   }
 
   .title-screen button {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   .menu-actions button {
