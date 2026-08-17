@@ -179,6 +179,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /\.arcade-controls/);
   assert.match(component, /canRespawn=\{readout\.onFoot && !readout\.parachuting\}/);
   assert.match(component, /arcade-respawn-button/);
+  assert.match(component, /stick-shaft/);
   assert.match(component, /Quit ground pilot and respawn in a plane/);
   assert.match(component, /pagehide/);
   assert.match(styles, /\.arcade-respawn-button/);
@@ -189,6 +190,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /font-size: 10px/);
   assert.match(styles, /min-height: 38px/);
   assert.match(styles, /--stick-y/);
+  assert.match(styles, /clip-path: polygon/);
+  assert.match(styles, /\.arcade-stick:active \.stick-knob/);
   assert.match(styles, /\.callsign-preview/);
   assert.doesNotMatch(styles, /\.face-editor|\.pixel-portrait/);
   assert.match(styles, /\.pilot-lineup/);

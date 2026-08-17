@@ -1350,6 +1350,7 @@ function ArcadeControls({
         onLostPointerCapture={releaseStick}
       >
         <span className="stick-rail" />
+        <span className="stick-shaft" />
         <span className="stick-knob" />
         <span className="stick-label">{pilotOnFoot ? "ROTATE / MOVE" : "TURN / ROLL"}</span>
       </button>
