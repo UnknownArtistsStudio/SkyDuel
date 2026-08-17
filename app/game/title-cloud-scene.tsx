@@ -82,14 +82,14 @@ function drawIntroFrame(
   context.clearRect(0, 0, WIDTH, HEIGHT);
   context.fillStyle = SKY;
   context.fillRect(0, 0, WIDTH, HEIGHT);
-  context.drawImage(titleLayer, 0, 0);
 
   for (const flight of FLIGHTS) {
     const progress = flightProgress(time, flight.delay);
     if (progress === null) continue;
-    drawCloudOpening(context, flight.anchor, progress);
     drawLoopingGamePlane(context, flight, progress, time);
   }
+
+  context.drawImage(titleLayer, 0, 0);
 }
 
 function drawCloudTitle() {
@@ -162,19 +162,6 @@ function cubicDirection(flight: CloudFlight, progress: number) {
     6 * inverse * progress * (flight.controlTwo.y - flight.controlOne.y) +
     3 * progress * progress * (flight.anchor.y - flight.controlTwo.y);
   return Math.atan2(y, x);
-}
-
-function drawCloudOpening(context: CanvasRenderingContext2D, anchor: Point, progress: number) {
-  const opening = Math.sin(Math.PI * progress);
-  const width = Math.round(12 + opening * 24);
-  const height = Math.round(8 + opening * 12);
-  context.fillStyle = SKY;
-  context.fillRect(
-    Math.round(anchor.x - width / 2),
-    Math.round(anchor.y - height / 2),
-    width,
-    height,
-  );
 }
 
 function drawLoopingGamePlane(

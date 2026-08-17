@@ -155,7 +155,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /resetRendererEffects/);
   assert.match(titleScene, /drawCloudTitle/);
   assert.match(titleScene, /drawLoopingGamePlane/);
-  assert.match(titleScene, /drawCloudOpening/);
+  assert.doesNotMatch(titleScene, /drawCloudOpening/);
   assert.match(titleScene, /drawGameCloud/);
   assert.match(titleScene, /drawGamePlaneSprite/);
   assert.match(titleScene, /cubicPoint/);
