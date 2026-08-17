@@ -72,7 +72,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /3 KILLS = MISSILE/);
   assert.match(component, /AIM \+ FIRE \/ B ROCKET/);
   assert.match(component, /PILOT ROCKET READY \/ B FIRE/);
-  assert.match(component, /<span>COMPUTERS<\/span>/);
+  assert.match(component, /<span>CPU PLAYERS<\/span>/);
   assert.match(component, /6 PILOTS MAX/);
   assert.match(component, /QUIT PILOT \/ RESPAWN/);
   assert.doesNotMatch(component, /NOT STORED|ALLOW MIC FIRST TIME/);

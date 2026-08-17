@@ -1473,8 +1473,8 @@ function ComputerPicker({
     { value: 5, label: "5" },
   ];
   return (
-    <div className="choice-group computer-picker" role="group" aria-label="Computer pilots">
-      <span>COMPUTERS</span>
+    <div className="choice-group computer-picker" role="group" aria-label="CPU players">
+      <span>CPU PLAYERS</span>
       {choices.map((choice) => (
         <button
           key={choice.value}
