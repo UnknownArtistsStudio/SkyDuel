@@ -607,6 +607,10 @@ strong {
 
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
   .game-root {
+    height: 100svh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
     padding: 0;
   }
 
@@ -619,16 +623,23 @@ strong {
   }
 
   .screen-title .game-screen {
+    width: min(100%, 150dvh);
     min-height: 0;
     aspect-ratio: 3 / 2;
   }
 
   .title-screen {
-    padding: 5%;
+    place-items: center;
+    padding: 0;
+  }
+
+  .title-screen button {
+    position: absolute;
+    bottom: 12%;
   }
 
   .hangar-overlay {
-    align-items: start;
+    align-items: safe center;
     padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
   }
 
@@ -661,6 +672,8 @@ strong {
 
   .callsign-field input {
     grid-column: 2;
+    padding: 8px;
+    background: var(--black);
     font-size: 15px;
     line-height: 1.1;
   }
@@ -692,13 +705,32 @@ strong {
   }
 
   .setup-rules .choice-group button {
-    min-height: 25px;
-    font-size: 6px;
+    min-height: 38px;
+    padding: 5px;
+    color: var(--white);
+    background: var(--black);
+    font-size: 7px;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .setup-rules .choice-group button[aria-pressed="true"] {
+    color: var(--black);
+    background: var(--orange);
+  }
+
+  .setup-rules .choice-group button[aria-pressed="true"]::before {
+    display: none;
   }
 
   .setup-help-button {
     margin-top: 7px;
+    min-height: 34px;
+    padding: 5px 10px;
+    color: var(--white);
+    background: var(--black);
     font-size: 7px;
+    text-align: center;
   }
 
   .setup-help {
@@ -714,8 +746,12 @@ strong {
   }
 
   .menu-actions button {
-    min-height: 30px;
-    font-size: 7px;
+    min-height: 42px;
+    padding: 7px;
+    color: var(--white);
+    background: var(--black);
+    font-size: 8px;
+    text-align: center;
   }
 
   .scoreboard {
@@ -924,6 +960,145 @@ strong {
     height: 58px;
     color: var(--red);
     font-size: 8px;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .game-root {
+    height: 100svh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .game-screen {
+    width: 100%;
+    min-height: 100svh;
+    min-height: 100dvh;
+    aspect-ratio: auto;
+    outline: 0;
+  }
+
+  .screen-title .game-screen {
+    width: min(100%, 150dvh);
+    min-height: 0;
+    aspect-ratio: 3 / 2;
+  }
+
+  .title-screen {
+    place-items: center;
+    padding: 0;
+  }
+
+  .title-screen button {
+    position: absolute;
+    bottom: 12%;
+  }
+
+  .hangar-overlay {
+    align-items: safe center;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 10px) calc(env(safe-area-inset-bottom, 0px) + 8px) calc(env(safe-area-inset-left, 0px) + 10px);
+  }
+
+  .menu-card {
+    width: min(840px, 100%);
+    font-size: 7px;
+    line-height: 1.3;
+  }
+
+  .menu-eyebrow,
+  .callsign-preview {
+    display: none;
+  }
+
+  .menu-card h1 {
+    margin-bottom: 4px;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .callsign-field {
+    grid-template-columns: 58px 1fr;
+    gap: 5px;
+    margin: 2px 0 5px;
+  }
+
+  .callsign-field input {
+    grid-column: 2;
+    padding: 7px;
+    background: var(--black);
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .setup-rules {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 14px;
+  }
+
+  .setup-rules .choice-group,
+  .setup-rules .computer-picker {
+    display: flex;
+    grid-column: auto;
+    gap: 4px;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .setup-rules .computer-picker {
+    grid-column: 1 / -1;
+  }
+
+  .setup-rules .choice-group > span {
+    flex: 0 0 52px;
+    align-self: center;
+    font-size: 6px;
+  }
+
+  .setup-rules .choice-group button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px;
+    color: var(--white);
+    background: var(--black);
+    font-size: 6px;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .setup-rules .choice-group button[aria-pressed="true"] {
+    color: var(--black);
+    background: var(--orange);
+  }
+
+  .setup-rules .choice-group button[aria-pressed="true"]::before {
+    display: none;
+  }
+
+  .setup-help-button {
+    min-height: 30px;
+    margin-top: 5px;
+    padding: 4px 10px;
+    color: var(--white);
+    background: var(--black);
+    font-size: 6px;
+    text-align: center;
+  }
+
+  .menu-actions {
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .menu-actions button {
+    min-height: 38px;
+    padding: 6px;
+    color: var(--white);
+    background: var(--black);
+    font-size: 7px;
+    text-align: center;
   }
 }
 

@@ -96,7 +96,11 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /TURN PHONE/);
   assert.match(component, /LANDSCAPE/);
   assert.match(component, /<span>MAP<\/span>/);
-  assert.match(component, /PEAKS/);
+  assert.match(component, /MOUNTAINS/);
+  assert.match(component, /FREE FOR ALL/);
+  assert.match(component, /10 KILLS/);
+  assert.match(component, /BOMBS ON/);
+  assert.match(component, /PARACHUTES ON/);
   assert.match(component, /YOUR PILOT/);
   assert.match(component, /callsign-preview/);
   assert.doesNotMatch(component, /PIXEL PILOT|PixelFaceEditor|PixelPortrait/);
@@ -179,6 +183,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /pagehide/);
   assert.match(styles, /\.arcade-respawn-button/);
   assert.match(styles, /width: min\(100%, 150dvh\)/);
+  assert.match(styles, /max-height: 600px/);
+  assert.match(styles, /background: var\(--orange\)/);
+  assert.match(styles, /min-height: 38px/);
   assert.match(styles, /--stick-y/);
   assert.match(styles, /\.callsign-preview/);
   assert.doesNotMatch(styles, /\.face-editor|\.pixel-portrait/);
