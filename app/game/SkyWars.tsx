@@ -1132,13 +1132,13 @@ export function SkyWars() {
                       aria-pressed={matchMode === "teams"}
                       onClick={() => setMatchMode("teams")}
                     >
-                      TEAM BATTLE
+                      TEAMS
                     </button>
                   </div>
                   <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
                   <ComputerPicker value={computerCount} onChange={setComputerCount} />
                   <div className="choice-group damage-picker" role="group" aria-label="Plane damage">
-                    <span>HITS</span>
+                    <span>DAMAGE</span>
                     <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
                       1 HIT
                     </button>
@@ -1161,19 +1161,19 @@ export function SkyWars() {
                   <div className="choice-group bomb-picker" role="group" aria-label="Bomb power-ups">
                     <span>BOMBS</span>
                     <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
-                      BOMBS OFF
+                      OFF
                     </button>
                     <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
-                      BOMBS ON
+                      ON
                     </button>
                   </div>
                   <div className="choice-group eject-picker" role="group" aria-label="Parachute mode">
-                    <span>EJECT</span>
+                    <span>PARACHUTES</span>
                     <button type="button" aria-pressed={!parachuteMode} onClick={() => setParachuteMode(false)}>
-                      PARACHUTES OFF
+                      OFF
                     </button>
                     <button type="button" aria-pressed={parachuteMode} onClick={() => setParachuteMode(true)}>
-                      PARACHUTES ON
+                      ON
                     </button>
                   </div>
                   {matchMode === "teams" && (
@@ -1465,16 +1465,16 @@ function ComputerPicker({
   onChange: (computerCount: ComputerCount) => void;
 }) {
   const choices: Array<{ value: ComputerCount; label: string }> = [
-    { value: 0, label: "NO COMPS" },
-    { value: 1, label: "1 COMP" },
-    { value: 2, label: "2 COMPS" },
-    { value: 3, label: "3 COMPS" },
-    { value: 4, label: "4 COMPS" },
-    { value: 5, label: "5 COMPS" },
+    { value: 0, label: "0" },
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 4, label: "4" },
+    { value: 5, label: "5" },
   ];
   return (
     <div className="choice-group computer-picker" role="group" aria-label="Computer pilots">
-      <span>COMPS</span>
+      <span>COMPUTERS</span>
       {choices.map((choice) => (
         <button
           key={choice.value}
@@ -1497,14 +1497,14 @@ function ScorePicker({
   onChange: (scoreLimit: ScoreLimit) => void;
 }) {
   const choices: Array<{ value: ScoreLimit; label: string }> = [
-    { value: 5, label: "5 KILLS" },
-    { value: 10, label: "10 KILLS" },
-    { value: 20, label: "20 KILLS" },
+    { value: 5, label: "5" },
+    { value: 10, label: "10" },
+    { value: 20, label: "20" },
     { value: null, label: "NO LIMIT" },
   ];
   return (
     <div className="choice-group score-picker" role="group" aria-label="Winning score">
-      <span>WIN</span>
+      <span>KILLS TO WIN</span>
       {choices.map((choice) => (
         <button
           key={choice.label}

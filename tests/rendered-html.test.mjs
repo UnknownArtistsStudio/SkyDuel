@@ -72,7 +72,7 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /3 KILLS = MISSILE/);
   assert.match(component, /AIM \+ FIRE \/ B ROCKET/);
   assert.match(component, /PILOT ROCKET READY \/ B FIRE/);
-  assert.match(component, /<span>COMPS<\/span>/);
+  assert.match(component, /<span>COMPUTERS<\/span>/);
   assert.match(component, /6 PILOTS MAX/);
   assert.match(component, /QUIT PILOT \/ RESPAWN/);
   assert.doesNotMatch(component, /NOT STORED|ALLOW MIC FIRST TIME/);
@@ -89,8 +89,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /MISSILE ARMED/);
   assert.match(component, /EJECT EJECT/);
   assert.match(component, /MAYDAY MAYDAY/);
-  assert.match(component, /<span>HITS<\/span>/);
-  assert.match(component, /<span>EJECT<\/span>/);
+  assert.match(component, /<span>DAMAGE<\/span>/);
+  assert.match(component, /<span>PARACHUTES<\/span>/);
   assert.doesNotMatch(component, /PARACHUTE EQUIPPED|REVENGE PILOT/);
   assert.match(component, /ROTATE \/ MOVE/);
   assert.match(component, /TURN PHONE/);
@@ -98,9 +98,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /<span>MAP<\/span>/);
   assert.match(component, /MOUNTAINS/);
   assert.match(component, /FREE FOR ALL/);
-  assert.match(component, /10 KILLS/);
-  assert.match(component, /BOMBS ON/);
-  assert.match(component, /PARACHUTES ON/);
+  assert.match(component, /KILLS TO WIN/);
+  assert.match(component, /aria-pressed=\{bombsEnabled\}/);
+  assert.match(component, /aria-pressed=\{parachuteMode\}/);
   assert.match(component, /YOUR PILOT/);
   assert.match(component, /callsign-preview/);
   assert.doesNotMatch(component, /PIXEL PILOT|PixelFaceEditor|PixelPortrait/);
@@ -185,6 +185,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /width: min\(100%, 150dvh\)/);
   assert.match(styles, /max-height: 600px/);
   assert.match(styles, /background: var\(--orange\)/);
+  assert.match(styles, /min-height: 44px/);
+  assert.match(styles, /font-size: 10px/);
   assert.match(styles, /min-height: 38px/);
   assert.match(styles, /--stick-y/);
   assert.match(styles, /\.callsign-preview/);
