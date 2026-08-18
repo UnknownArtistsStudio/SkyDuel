@@ -962,8 +962,14 @@ strong {
   }
 
   .talk-button {
+    display: grid;
+    place-content: center;
+    gap: 3px;
+    width: 68px;
+    height: 62px;
     color: var(--black);
     background: var(--orange);
+    font-size: 7px;
   }
 
   .bomb-button {

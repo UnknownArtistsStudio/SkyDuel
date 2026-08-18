@@ -1193,7 +1193,7 @@ export function SkyWars() {
                     <span>FLY</span><strong>A/D OR STICK</strong>
                     <span>FIRE</span><strong>SPACE OR FIRE</strong>
                     <span>ROLL</span><strong>A+D OR TAP STICK</strong>
-                    <span>RADIO</span><strong>HOLD T OR TALK</strong>
+                    <span>RADIO</span><strong>HOLD T OR PUSH TO TALK</strong>
                     <span>SPECIAL</span><strong>B OR SPECIAL BUTTON</strong>
                     <span>REWARD</span><strong>3 KILLS = MISSILE</strong>
                     <span>ON FOOT</span><strong>AIM + FIRE / B ROCKET</strong>
@@ -1275,19 +1275,21 @@ function ArcadeControls({
   onTalkEnd: () => void;
 }) {
   const stickPointerRef = useRef<number | null>(null);
+  const talkPointerRef = useRef<number | null>(null);
   const stickMovedRef = useRef(false);
   const [stickX, setStickX] = useState(0);
   const [firing, setFiring] = useState(false);
 
   const releaseControls = useCallback(() => {
     stickPointerRef.current = null;
+    talkPointerRef.current = null;
     stickMovedRef.current = false;
     setStickX(0);
     setFiring(false);
     onTurn(0);
     onFire(false);
-    if (isTalking) onTalkEnd();
-  }, [isTalking, onFire, onTalkEnd, onTurn]);
+    onTalkEnd();
+  }, [onFire, onTalkEnd, onTurn]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -1323,6 +1325,13 @@ function ArcadeControls({
     setStickX(offset);
     onTurn(offset < -7 ? -1 : offset > 7 ? 1 : 0);
   }, [onTurn]);
+
+  const releaseTalk = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (talkPointerRef.current !== event.pointerId) return;
+    event.preventDefault();
+    talkPointerRef.current = null;
+    onTalkEnd();
+  }, [onTalkEnd]);
 
   return (
     <div className="arcade-controls" aria-label="Arcade flight controls">
@@ -1376,20 +1385,23 @@ function ArcadeControls({
           className="arcade-button talk-button"
           type="button"
           disabled={disabled}
-          aria-label="Hold to talk"
+          aria-label="Push to talk — hold to transmit"
           aria-pressed={isTalking}
           onContextMenu={(event) => event.preventDefault()}
           onPointerDown={(event) => {
             if (disabled) return;
             event.preventDefault();
+            event.stopPropagation();
+            talkPointerRef.current = event.pointerId;
             event.currentTarget.setPointerCapture(event.pointerId);
             onTalkStart();
           }}
-          onPointerUp={onTalkEnd}
-          onPointerCancel={onTalkEnd}
-          onLostPointerCapture={onTalkEnd}
+          onPointerUp={releaseTalk}
+          onPointerCancel={releaseTalk}
+          onLostPointerCapture={releaseTalk}
         >
-          TALK
+          <span>PUSH</span>
+          <span>TO TALK</span>
         </button>
         {specialWeapon && (
           <button

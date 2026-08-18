@@ -68,7 +68,10 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /<span>BOMBS<\/span>/);
   assert.match(component, /RADIO SENT/);
   assert.match(component, /\+ CONTROLS/);
-  assert.match(component, /HOLD T OR TALK/);
+  assert.match(component, /HOLD T OR PUSH TO TALK/);
+  assert.match(component, /talkPointerRef/);
+  assert.match(component, /<span>PUSH<\/span>/);
+  assert.match(component, /<span>TO TALK<\/span>/);
   assert.match(component, /3 KILLS = MISSILE/);
   assert.match(component, /AIM \+ FIRE \/ B ROCKET/);
   assert.match(component, /PILOT ROCKET READY \/ B FIRE/);
