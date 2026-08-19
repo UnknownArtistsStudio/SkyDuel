@@ -883,14 +883,19 @@ export function SkyWars() {
         isTalkingRef.current || voicePlayingRef.current || computerVoiceBusyRef.current > 0,
         state.groundPilots.length > 0 && !state.winner,
       );
-      playNewSounds(
-        state,
-        lastSoundEventRef,
-        audioRef,
-        localIdRef.current,
-        computerVoiceBusyRef,
-        flashRadio,
-      );
+      if (screen === "playing") {
+        playNewSounds(
+          state,
+          lastSoundEventRef,
+          audioRef,
+          localIdRef.current,
+          computerVoiceBusyRef,
+          flashRadio,
+        );
+      } else {
+        const latestAttractEvent = state.events[state.events.length - 1];
+        if (latestAttractEvent) lastSoundEventRef.current = latestAttractEvent.id;
+      }
       if (canvasRef.current) {
         renderGame(canvasRef.current, state, localIdRef.current, time, chatBubblesRef.current);
       }
@@ -1117,67 +1122,49 @@ export function SkyWars() {
                   <span>YOUR PILOT</span>
                   <strong>{cleanName(callsign)}</strong>
                 </div>
-                <div className="setup-rules">
-                  <div className="choice-group mode-picker" role="group" aria-label="Room rules">
-                    <span>MODE</span>
-                    <button
-                      type="button"
-                      aria-pressed={matchMode === "free-for-all"}
-                      onClick={() => setMatchMode("free-for-all")}
-                    >
-                      FREE FOR ALL
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={matchMode === "teams"}
-                      onClick={() => setMatchMode("teams")}
-                    >
-                      TEAMS
-                    </button>
-                  </div>
-                  <ScorePicker value={scoreLimit} onChange={setScoreLimit} />
-                  <ComputerPicker value={computerCount} onChange={setComputerCount} />
-                  <div className="choice-group damage-picker" role="group" aria-label="Plane damage">
-                    <span>DAMAGE</span>
-                    <button type="button" aria-pressed={planeHits === 1} onClick={() => setPlaneHits(1)}>
-                      1 HIT
-                    </button>
-                    <button type="button" aria-pressed={planeHits === 3} onClick={() => setPlaneHits(3)}>
-                      3 HITS
-                    </button>
-                  </div>
-                  <div className="choice-group landscape-picker" role="group" aria-label="Landscape">
-                    <span>MAP</span>
-                    <button type="button" aria-pressed={landscape === "tower"} onClick={() => setLandscape("tower")}>
-                      TOWER
-                    </button>
-                    <button type="button" aria-pressed={landscape === "sea"} onClick={() => setLandscape("sea")}>
-                      SEA
-                    </button>
-                    <button type="button" aria-pressed={landscape === "mountains"} onClick={() => setLandscape("mountains")}>
-                      MOUNTAINS
-                    </button>
-                  </div>
-                  <div className="choice-group bomb-picker" role="group" aria-label="Bomb power-ups">
-                    <span>BOMBS</span>
-                    <button type="button" aria-pressed={!bombsEnabled} onClick={() => setBombsEnabled(false)}>
-                      OFF
-                    </button>
-                    <button type="button" aria-pressed={bombsEnabled} onClick={() => setBombsEnabled(true)}>
-                      ON
-                    </button>
-                  </div>
-                  <div className="choice-group eject-picker" role="group" aria-label="Parachute mode">
-                    <span>PARACHUTES</span>
-                    <button type="button" aria-pressed={!parachuteMode} onClick={() => setParachuteMode(false)}>
-                      OFF
-                    </button>
-                    <button type="button" aria-pressed={parachuteMode} onClick={() => setParachuteMode(true)}>
-                      ON
-                    </button>
-                  </div>
+                <div className="setup-rules setup-board" aria-label="Game settings">
+                  <SetupChoiceButton
+                    label="MODE"
+                    value={matchMode === "teams" ? "TEAMS" : "FREE FOR ALL"}
+                    onClick={() => setMatchMode(matchMode === "teams" ? "free-for-all" : "teams")}
+                  />
+                  <SetupChoiceButton
+                    label="KILLS TO WIN"
+                    value={scoreLimit === null ? "NO LIMIT" : `${scoreLimit}`}
+                    onClick={() => setScoreLimit(scoreLimit === 5 ? 10 : scoreLimit === 10 ? 20 : scoreLimit === 20 ? null : 5)}
+                  />
+                  <SetupChoiceButton
+                    label="CPU PLAYERS"
+                    value={`${computerCount}`}
+                    onClick={() => setComputerCount(((computerCount + 1) % 6) as ComputerCount)}
+                  />
+                  <SetupChoiceButton
+                    label="DAMAGE"
+                    value={`${planeHits} HIT${planeHits === 1 ? "" : "S"}`}
+                    onClick={() => setPlaneHits(planeHits === 1 ? 3 : 1)}
+                  />
+                  <SetupChoiceButton
+                    label="MAP"
+                    value={landscape.toUpperCase()}
+                    onClick={() => setLandscape(landscape === "tower" ? "sea" : landscape === "sea" ? "mountains" : "tower")}
+                  />
+                  <SetupChoiceButton
+                    label="BOMBS"
+                    value={bombsEnabled ? "ON" : "OFF"}
+                    onClick={() => setBombsEnabled(!bombsEnabled)}
+                  />
+                  <SetupChoiceButton
+                    label="PARACHUTES"
+                    value={parachuteMode ? "ON" : "OFF"}
+                    wide={matchMode !== "teams"}
+                    onClick={() => setParachuteMode(!parachuteMode)}
+                  />
                   {matchMode === "teams" && (
-                    <TeamPicker value={teamPreference} onChange={setTeamPreference} />
+                    <SetupChoiceButton
+                      label="YOUR TEAM"
+                      value={teamPreference === "auto" ? "AUTO" : teamPreference === 0 ? "RED" : "GREEN"}
+                      onClick={() => setTeamPreference(teamPreference === "auto" ? 0 : teamPreference === 0 ? 1 : "auto")}
+                    />
                   )}
                 </div>
                 <button
@@ -1470,65 +1457,27 @@ function TeamPicker({
   );
 }
 
-function ComputerPicker({
+function SetupChoiceButton({
+  label,
   value,
-  onChange,
+  wide = false,
+  onClick,
 }: {
-  value: ComputerCount;
-  onChange: (computerCount: ComputerCount) => void;
+  label: string;
+  value: string;
+  wide?: boolean;
+  onClick: () => void;
 }) {
-  const choices: Array<{ value: ComputerCount; label: string }> = [
-    { value: 0, label: "0" },
-    { value: 1, label: "1" },
-    { value: 2, label: "2" },
-    { value: 3, label: "3" },
-    { value: 4, label: "4" },
-    { value: 5, label: "5" },
-  ];
   return (
-    <div className="choice-group computer-picker" role="group" aria-label="CPU players">
-      <span>CPU PLAYERS</span>
-      {choices.map((choice) => (
-        <button
-          key={choice.value}
-          type="button"
-          aria-pressed={value === choice.value}
-          onClick={() => onChange(choice.value)}
-        >
-          {choice.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ScorePicker({
-  value,
-  onChange,
-}: {
-  value: ScoreLimit;
-  onChange: (scoreLimit: ScoreLimit) => void;
-}) {
-  const choices: Array<{ value: ScoreLimit; label: string }> = [
-    { value: 5, label: "5" },
-    { value: 10, label: "10" },
-    { value: 20, label: "20" },
-    { value: null, label: "NO LIMIT" },
-  ];
-  return (
-    <div className="choice-group score-picker" role="group" aria-label="Winning score">
-      <span>KILLS TO WIN</span>
-      {choices.map((choice) => (
-        <button
-          key={choice.label}
-          type="button"
-          aria-pressed={value === choice.value}
-          onClick={() => onChange(choice.value)}
-        >
-          {choice.label}
-        </button>
-      ))}
-    </div>
+    <button
+      className={`setup-choice ${wide ? "is-wide" : ""}`}
+      type="button"
+      aria-label={`${label}: ${value}. Tap to change.`}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </button>
   );
 }
 
@@ -1586,7 +1535,7 @@ function wakeAudio(
     const gain = audioRef.current.createGain();
     oscillator.type = "square";
     oscillator.frequency.value = 58;
-    gain.gain.value = 0.0001;
+    gain.gain.value = 0;
     oscillator.connect(gain).connect(audioRef.current.destination);
     oscillator.start();
     engineSoundRef.current = { oscillator, gain };
@@ -1606,7 +1555,7 @@ function updateEngineSound(
   const speed = plane ? Math.min(240, Math.hypot(plane.vx, plane.vy)) : 0;
   engine.oscillator.frequency.setTargetAtTime(44 + speed * 0.09, context.currentTime, 0.08);
   const activeVolume = talking ? 0.0007 : 0.0045;
-  engine.gain.gain.setTargetAtTime(active ? activeVolume : 0.0001, context.currentTime, 0.06);
+  engine.gain.gain.setTargetAtTime(active ? activeVolume : 0, context.currentTime, 0.06);
 }
 
 function updateMusic(
