@@ -65,6 +65,10 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(component, /ArcadeControls/);
   assert.match(component, /MediaRecorder/);
   assert.match(component, /voice-request/);
+  assert.match(component, /radio-start-request/);
+  assert.match(component, /RADIO_FALLBACK_TEXT = "\.\.\."/);
+  assert.match(component, /showChat\(playerId, RADIO_FALLBACK_TEXT\)/);
+  assert.match(component, /showChat\(localIdRef\.current, recognitionTranscriptRef\.current\)/);
   assert.match(component, /label="BOMBS"/);
   assert.match(component, /RADIO SENT/);
   assert.match(component, /\+ CONTROLS/);

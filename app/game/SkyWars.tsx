@@ -46,6 +46,8 @@ type NetworkMessage =
   | { type: "snapshot"; state: GameState }
   | { type: "room-full" }
   | { type: "pilot-quit-request" }
+  | { type: "radio-start-request" }
+  | { type: "radio-start"; playerId: string }
   | { type: "chat-request"; text: string }
   | { type: "chat"; playerId: string; text: string }
   | { type: "voice-request"; clip: VoiceClipPayload }
@@ -97,6 +99,7 @@ declare global {
 const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: false };
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
+const RADIO_FALLBACK_TEXT = "...";
 const TITLE_MUSIC_LEAD_IN = 1200;
 
 export function SkyWars() {
@@ -237,6 +240,12 @@ export function SkyWars() {
     const plane = gameRef.current.players.find((candidate) => candidate.id === playerId);
     const groundPilot = gameRef.current.groundPilots.some((pilot) => pilot.ownerId === playerId);
     if (!clip || (!plane?.alive && !groundPilot) || gameRef.current.winner) return null;
+    const activeBubble = chatBubblesRef.current.find(
+      (bubble) => bubble.playerId === playerId && bubble.expiresAt > now,
+    );
+    if (!activeBubble || activeBubble.text === RADIO_FALLBACK_TEXT) {
+      showChat(playerId, RADIO_FALLBACK_TEXT);
+    }
     voiceRateRef.current.set(playerId, now);
     enqueueRadioClip(
       clip,
@@ -251,7 +260,7 @@ export function SkyWars() {
       isTalkingRef.current,
     );
     return clip;
-  }, [flashRadio]);
+  }, [flashRadio, showChat]);
 
   const clearChat = useCallback(() => {
     if (radioMessageTimerRef.current !== null) {
@@ -325,6 +334,12 @@ export function SkyWars() {
       if (role === "host" && incoming.type === "pilot-quit-request") {
         quitGroundPilot(gameRef.current, peerId);
       }
+      if (role === "host" && incoming.type === "radio-start-request") {
+        const text = showChat(peerId, RADIO_FALLBACK_TEXT);
+        if (text) {
+          room.broadcast({ type: "radio-start", playerId: peerId } satisfies NetworkMessage);
+        }
+      }
       if (role === "host" && incoming.type === "chat-request") {
         const text = acceptChat(peerId, incoming.text);
         if (text) {
@@ -362,6 +377,13 @@ export function SkyWars() {
         roomRef.current = null;
         setMode(null);
         setScreen("join");
+      }
+      if (
+        role === "guest" &&
+        peerId === room.info.hostPeerId &&
+        incoming.type === "radio-start"
+      ) {
+        showChat(incoming.playerId, RADIO_FALLBACK_TEXT);
       }
       if (
         role === "guest" &&
@@ -670,6 +692,13 @@ export function SkyWars() {
     wakeAudio(audioRef, engineSoundRef);
     isTalkingRef.current = true;
     setIsTalking(true);
+    const playerId = localIdRef.current;
+    showChat(playerId, RADIO_FALLBACK_TEXT);
+    if (mode === "guest") {
+      roomRef.current?.sendToHost({ type: "radio-start-request" } satisfies NetworkMessage);
+    } else if (mode === "host") {
+      roomRef.current?.broadcast({ type: "radio-start", playerId } satisfies NetworkMessage);
+    }
     flashRadio("TRANSMITTING...", 0);
     void startVoiceCapture();
 
@@ -694,6 +723,9 @@ export function SkyWars() {
         transcript += `${event.results[index][0]?.transcript ?? ""} `;
       }
       recognitionTranscriptRef.current = cleanChatText(transcript);
+      if (recognitionTranscriptRef.current) {
+        showChat(localIdRef.current, recognitionTranscriptRef.current);
+      }
     };
     recognition.onerror = (event) => {
       recognitionError = event.error;
@@ -729,7 +761,7 @@ export function SkyWars() {
       flashRadio("VOICE ONLY / 3 SEC MAX", 0);
       recognitionTimerRef.current = window.setTimeout(stopTalking, VOICE_CLIP_SECONDS * 1000);
     }
-  }, [flashRadio, screen, sendChat, startVoiceCapture, stopTalking, stopVoiceCapture]);
+  }, [flashRadio, mode, screen, sendChat, showChat, startVoiceCapture, stopTalking, stopVoiceCapture]);
 
   const setArcadeTurn = useCallback((turn: -1 | 0 | 1) => {
     if (turn !== 0) void audioRef.current?.resume();
