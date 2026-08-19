@@ -100,7 +100,6 @@ const neutralInput: PilotInput = { turn: 0, fire: false, bomb: false, roll: fals
 const CHAT_DURATION = 4600;
 const CHAT_COOLDOWN = 900;
 const RADIO_FALLBACK_TEXT = "...";
-const TITLE_MUSIC_LEAD_IN = 1200;
 
 export function SkyWars() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -130,8 +129,6 @@ export function SkyWars() {
   const recognitionStoppingRef = useRef(false);
   const recognitionTimerRef = useRef<number | null>(null);
   const radioMessageTimerRef = useRef<number | null>(null);
-  const titleStartTimerRef = useRef<number | null>(null);
-  const startPendingRef = useRef(false);
   const recognitionTranscriptRef = useRef("");
   const isTalkingRef = useRef(false);
 
@@ -403,14 +400,8 @@ export function SkyWars() {
   }, [acceptChat, acceptVoice, showChat]);
 
   const pressStart = useCallback(() => {
-    if (startPendingRef.current) return;
-    startPendingRef.current = true;
     wakeAudio(audioRef, engineSoundRef);
-    titleStartTimerRef.current = window.setTimeout(() => {
-      titleStartTimerRef.current = null;
-      startPendingRef.current = false;
-      setScreen("menu");
-    }, TITLE_MUSIC_LEAD_IN);
+    setScreen("menu");
   }, []);
 
   const beginPractice = useCallback(() => {
@@ -964,7 +955,6 @@ export function SkyWars() {
     computerVoiceBusyRef.current = 0;
     if (recognitionTimerRef.current !== null) window.clearTimeout(recognitionTimerRef.current);
     if (radioMessageTimerRef.current !== null) window.clearTimeout(radioMessageTimerRef.current);
-    if (titleStartTimerRef.current !== null) window.clearTimeout(titleStartTimerRef.current);
     void roomRef.current?.close();
     engineSoundRef.current?.oscillator.stop();
     void audioRef.current?.close();

@@ -86,7 +86,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.doesNotMatch(component, /chatInputOpen|TYPE MESSAGE|ENTER FOR TEXT|ENTER: TYPE MESSAGE|MESSAGE &gt;/);
   assert.match(component, /A\+D ROLL/);
   assert.match(component, /ROLL RESET/);
-  assert.match(component, /TITLE_MUSIC_LEAD_IN/);
+  assert.doesNotMatch(component, /TITLE_MUSIC_LEAD_IN|titleStartTimerRef|startPendingRef/);
+  assert.match(component, /const pressStart = useCallback\(\(\) => \{\s*wakeAudio\(audioRef, engineSoundRef\);\s*setScreen\("menu"\);/);
   assert.match(component, /MISSILE READY/);
   assert.match(component, /MISSILES/);
   assert.match(component, /SpeechSynthesisUtterance/);
