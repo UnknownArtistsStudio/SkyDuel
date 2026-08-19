@@ -211,6 +211,10 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /\.pilot-lineup/);
   assert.doesNotMatch(styles, /chat-composer/);
   assert.match(styles, /safe-area-inset-bottom/);
+  assert.match(styles, /width: 100dvw/);
+  assert.match(styles, /max-width: 100dvw/);
+  assert.match(styles, /\.screen-playing\.game-root \{\s*touch-action: none/);
+  assert.match(styles, /\.callsign-field input \{[\s\S]*?font-size: 16px/);
   assert.match(styles, /pointer: coarse/);
   assert.match(styles, /orientation: portrait/);
   assert.match(styles, /\.setup-rules/);
