@@ -10,7 +10,7 @@ export const RELOAD_TIME = 1.35;
 export const ROLL_DURATION = 0.58;
 export const ROLL_RECHARGE = 1.35;
 export const MISSILE_DROP_TIME = 0.42;
-export const PILOT_GUN_HITS = 6;
+export const PILOT_GUN_HITS = 10;
 export const SEA_WRECK_SINK_TIME = 5;
 
 export type MatchMode = "free-for-all" | "teams";
@@ -40,8 +40,10 @@ const BOMB_GRAVITY = 210;
 const BOMB_PICKUP_RADIUS = 28;
 const BOMB_LIFE = 8;
 const PILOT_AIM_LIMIT = Math.PI / 2;
-const PILOT_AIM_SPEED = Math.PI * 0.95;
+const PILOT_AIM_SPEED = Math.PI * 1.55;
 const PILOT_BULLET_SPEED = 330;
+const PILOT_FIRE_DELAY = 0.095;
+const PILOT_RECOIL_DURATION = 0.07;
 
 export type PilotInput = {
   turn: -1 | 0 | 1;
@@ -118,6 +120,7 @@ export type GroundPilot = {
   strandedFor: number;
   aimAngle: number;
   fireCooldown: number;
+  recoilFor?: number;
   invulnerableFor: number;
 };
 
@@ -669,6 +672,7 @@ function updateGroundPilots(state: GameState, inputs: Record<string, PilotInput>
     const owner = state.players.find((plane) => plane.id === pilot.ownerId);
     pilot.invulnerableFor = Math.max(0, pilot.invulnerableFor - dt);
     pilot.fireCooldown = Math.max(0, pilot.fireCooldown - dt);
+    pilot.recoilFor = Math.max(0, (pilot.recoilFor ?? 0) - dt);
     if (owner) owner.specialCooldown = Math.max(0, owner.specialCooldown - dt);
     pilot.aimAngle = clamp(
       (Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0) + input.turn * PILOT_AIM_SPEED * dt,
@@ -727,7 +731,8 @@ function firePilotGun(
   state: GameState,
   pilot: GroundPilot,
 ) {
-  pilot.fireCooldown = 0.16;
+  pilot.fireCooldown = PILOT_FIRE_DELAY;
+  pilot.recoilFor = PILOT_RECOIL_DURATION;
   const aimAngle = clamp(
     Number.isFinite(pilot.aimAngle) ? pilot.aimAngle : 0,
     -PILOT_AIM_LIMIT,
@@ -1106,6 +1111,7 @@ function destroyPlane(
       strandedFor: 0,
       aimAngle: 0,
       fireCooldown: 0,
+      recoilFor: 0,
       invulnerableFor: 0.3,
     });
     if (ejects) pushEvent(state, "pilot-eject", plane.id, targetId, plane.x, plane.y);

@@ -167,12 +167,19 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
       context.fillRect(-13, -29, 3, 20);
       context.fillRect(10, -29, 3, 20);
     }
+    const aimAngle = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pilot.aimAngle ?? 0));
+    const recoiling = (pilot.recoilFor ?? 0) > 0;
+    if (recoiling) {
+      context.translate(
+        Math.round(-Math.sin(aimAngle) * 3),
+        Math.round(Math.cos(aimAngle) * 2),
+      );
+    }
     context.fillStyle = "#fffdf8";
     context.fillRect(-4, -10, 8, 7);
     context.fillStyle = color;
     context.fillRect(-5, -3, 10, 11);
     context.fillStyle = "#17131f";
-    const aimAngle = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pilot.aimAngle ?? 0));
     const hasLauncher = !pilot.falling && (owner?.missiles ?? 0) > 0;
     for (const distance of hasLauncher ? [4, 8, 12] : [4, 7, 10]) {
       const gunX = Math.round(Math.sin(aimAngle) * distance);
@@ -180,6 +187,13 @@ function drawGroundPilots(context: CanvasRenderingContext2D, state: GameState, v
       const size = hasLauncher ? 4 : 3;
       context.fillRect(gunX - Math.floor(size / 2), gunY - Math.floor(size / 2), size, size);
     }
+    if (recoiling) {
+      const muzzleX = Math.round(Math.sin(aimAngle) * 15);
+      const muzzleY = Math.round(-6 - Math.cos(aimAngle) * 15);
+      context.fillStyle = "#f2a913";
+      context.fillRect(muzzleX - 2, muzzleY - 2, 4, 4);
+    }
+    context.fillStyle = "#17131f";
     context.fillRect(-7, 8, 5, 7);
     context.fillRect(2, 8, 5, 7);
     if (pilot.ownerId === viewerId) {

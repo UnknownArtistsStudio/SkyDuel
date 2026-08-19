@@ -141,7 +141,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(core, /missileMilestones/);
   assert.match(core, /launchPilotMissile/);
   assert.match(core, /cloudPosition/);
-  assert.match(core, /PILOT_GUN_HITS = 6/);
+  assert.match(core, /PILOT_GUN_HITS = 10/);
+  assert.match(core, /PILOT_AIM_SPEED = Math\.PI \* 1\.55/);
+  assert.match(core, /PILOT_FIRE_DELAY = 0\.095/);
   assert.match(core, /PILOT_AIM_SPEED/);
   assert.match(core, /aimAngle/);
   assert.match(core, /SEA_WRECK_SINK_TIME = 5/);
@@ -164,6 +166,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /drawPilotBullets/);
   assert.match(renderer, /pilot-quit/);
   assert.match(renderer, /Math\.sin\(aimAngle\)/);
+  assert.match(renderer, /pilot\.recoilFor/);
+  assert.match(renderer, /muzzleX/);
   assert.match(renderer, /planeInCloud/);
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);

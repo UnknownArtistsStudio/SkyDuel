@@ -249,6 +249,7 @@ test("parachute mode ejects an armed vulnerable pilot after every weapon takedow
 
   stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
   assert.ok(state.pilotBullets.some((bullet) => bullet.ownerId === carrier.id));
+  assert.ok(state.groundPilots[0].recoilFor > 0, "the pilot did not recoil after firing");
 
   for (let frame = 0; frame < 10; frame += 1) {
     stepGame(state, { carrier: { turn: 1, fire: false, bomb: false, roll: false } }, FRAME);
@@ -257,7 +258,7 @@ test("parachute mode ejects an armed vulnerable pilot after every weapon takedow
   stepGame(state, { carrier: { turn: 0, fire: true, bomb: false, roll: false } }, 0);
   const angledShot = state.pilotBullets.at(-1);
   assert.ok(
-    angledShot.vx > 140 && angledShot.vx < 190 && angledShot.vy < -270,
+    angledShot.vx > 225 && angledShot.vx < 245 && angledShot.vy < -225 && angledShot.vy > -245,
     "the pilot gun did not fire along a smooth intermediate angle",
   );
 
@@ -339,7 +340,7 @@ test("the pilot machine gun needs sustained fire to destroy a plane", () => {
     invulnerableFor: 0,
   });
 
-  for (let hit = 1; hit <= 6; hit += 1) {
+  for (let hit = 1; hit <= 10; hit += 1) {
     state.pilotBullets.push({
       id: state.nextPilotBulletId++,
       ownerId: gunner.id,
@@ -350,7 +351,7 @@ test("the pilot machine gun needs sustained fire to destroy a plane", () => {
       life: 1,
     });
     stepGame(state, {}, 0);
-    assert.equal(target.alive, hit < 6);
+    assert.equal(target.alive, hit < 10);
   }
 
   assert.equal(gunner.score, 1);
