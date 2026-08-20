@@ -1,6 +1,6 @@
 # Sky Wars
 
-An original browser homage to early console biplane dogfights. Two to six pilots share a flat-colour pixel sky with fast automatic engine power, basic forward guns, momentum, stalls, genuine nose-down recovery, and a growing collection of unexpected match options.
+An original browser homage to early console biplane dogfights. One to six players share a flat-colour pixel sky with fast automatic engine power, basic forward guns, momentum, stalls, genuine nose-down recovery, and a growing collection of unexpected match options.
 
 ## Play
 

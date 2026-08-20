@@ -123,7 +123,7 @@ function drawCloudTitle() {
   context.font = '22px "SkyWarsPixel"';
   context.fillStyle = WHITE;
   context.textAlign = "center";
-  context.fillText("2-6 PILOTS", WIDTH / 2, 237);
+  context.fillText("1-6 PLAYERS", WIDTH / 2, 237);
   return layer;
 }
 

@@ -48,7 +48,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   ]);
 
   assert.match(component, /STALL \/ NOSE DOWN/);
-  assert.match(component, /SKY WARS \/ 2-6 PILOTS/);
+  assert.match(component, /SKY WARS \/ 1-6 PLAYERS/);
+  assert.doesNotMatch(component, /2-6 PILOTS/);
   assert.match(component, /TitleCloudScene/);
   assert.doesNotMatch(component, /SKY DUEL/i);
   assert.match(component, /SAFE \/ GUNS OFF/);
@@ -172,6 +173,8 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(renderer, /missileTrails/);
   assert.match(renderer, /resetRendererEffects/);
   assert.match(titleScene, /drawCloudTitle/);
+  assert.match(titleScene, /1-6 PLAYERS/);
+  assert.doesNotMatch(titleScene, /2-6 PILOTS/);
   assert.match(titleScene, /drawLoopingGamePlane/);
   assert.doesNotMatch(titleScene, /drawCloudOpening/);
   assert.match(titleScene, /drawGameCloud/);
@@ -225,7 +228,9 @@ test("keeps the original-style flight, pixel display, and multiplayer promises",
   assert.match(styles, /\.setup-rules/);
   assert.match(styles, /\.setup-help/);
   assert.match(layout, /viewportFit: "cover"/);
+  assert.match(layout, /one to six players/);
   assert.match(pagesShell, /viewport-fit=cover/);
+  assert.match(pagesShell, /one to six players/);
   assert.match(pagesShell, /Sky Wars/);
   assert.doesNotMatch(pagesShell, /Sky Duel/i);
   assert.match(peerRoom, /RTCPeerConnection/);

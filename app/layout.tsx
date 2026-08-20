@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   const title = "Sky Wars - Browser Biplane Dogfights";
   const description =
-    "A fast, stripped-back pixel biplane dogfight for two to six pilots. Climb, lead your shot, and recover from the stall.";
+    "A fast, stripped-back pixel biplane dogfight for one to six players. Climb, lead your shot, and recover from the stall.";
   return {
     metadataBase: base,
     title,

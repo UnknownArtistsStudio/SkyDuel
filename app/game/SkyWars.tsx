@@ -974,7 +974,7 @@ export function SkyWars() {
         {screen === "title" && (
           <div className="title-screen">
             <h1 className="title-heading">SKY WARS</h1>
-            <span className="title-subtitle">2-6 PILOTS</span>
+            <span className="title-subtitle">1-6 PLAYERS</span>
             <TitleCloudScene />
             <button type="button" onClick={pressStart}>PRESS START</button>
           </div>
@@ -1128,7 +1128,7 @@ export function SkyWars() {
           <div className="hangar-overlay">
             {screen === "menu" && (
               <div className="menu-card">
-                <p className="menu-eyebrow">SKY WARS / 2-6 PILOTS</p>
+                <p className="menu-eyebrow">SKY WARS / 1-6 PLAYERS</p>
                 <h1>GAME?</h1>
                 <label className="callsign-field">
                   <span>NAME</span>
